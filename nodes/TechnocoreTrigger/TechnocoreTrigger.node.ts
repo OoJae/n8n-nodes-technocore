@@ -11,6 +11,7 @@ import { scanExport, type ExportScan } from '../Technocore/shared/export';
 import { gapItem, messageItem } from '../Technocore/shared/items';
 import { normalizeOrigin } from '../Technocore/shared/origin';
 import {
+	MAX_BOUNDED_STALLS,
 	STATE_VERSION,
 	assemble,
 	isRecreation,
@@ -174,7 +175,7 @@ export class TechnocoreTrigger implements INodeType {
 		properties: [
 			{
 				displayName:
-					'Each poll is one read request (plus an export when a backlog needs backfilling). Poll every minute or less often per room to stay well inside Technocore rate limits.',
+					'Each poll is one read request (two when new messages follow a quiet poll, plus an export when a backlog needs backfilling). Poll every minute or less often per room to stay well inside Technocore rate limits.',
 				name: 'pollNotice',
 				type: 'notice',
 				default: '',
@@ -238,7 +239,7 @@ export class TechnocoreTrigger implements INodeType {
 				type: 'boolean',
 				default: true,
 				description:
-					'Whether to fetch the room export when more messages arrived than one read returns (200). When off, the skipped range is emitted as a gap item.',
+					'Whether to fetch the room export when more messages arrived than one read returns (200). When off, the skipped range is emitted as a not-backfilled gap item.',
 			},
 			{
 				displayName: 'Max Export Size (MB)',
@@ -248,7 +249,7 @@ export class TechnocoreTrigger implements INodeType {
 				default: 12,
 				displayOptions: { show: { backfillGaps: [true] } },
 				description:
-					'Stop reading the export after this many megabytes; anything not reached is emitted as a gap',
+					'Stop reading the export after this many megabytes (counted from its start, the oldest retained message); anything not reached is emitted as a backfill-bounded gap',
 			},
 		],
 	};
@@ -288,46 +289,73 @@ export class TechnocoreTrigger implements INodeType {
 		const staticData = this.getWorkflowStaticData('node');
 		const stored = readState(staticData[STATE_KEY], origin, room);
 		let state: TriggerState;
-		let leading: LeadingMode = { mode: 'report' };
 		if (!stored) {
 			if (startFrom !== 'retained') {
 				const view = await readView(this, `/r/${room}?limit=1&format=json`);
 				const initial: TriggerState = { v: STATE_VERSION, origin, room, cursor: view.last_seq };
 				if (view.generation !== undefined) initial.generation = view.generation;
+				// No visible message means last_seq is not the head (the server reports 0): the
+				// room's messages expired or it was reaped. Whatever it held is pre-activation
+				// history. A room that never existed (generation 0) has none.
+				if (!view.messages.length && view.generation !== 0) initial.baseline = true;
 				staticData[STATE_KEY] = initial as unknown as IDataObject;
 				return null;
 			}
-			state = { v: STATE_VERSION, origin, room, cursor: 0 };
-			leading = { mode: 'suppress' };
+			state = { v: STATE_VERSION, origin, room, cursor: 0, baseline: true };
 		} else {
 			state = stored;
 		}
 
 		const events: TriggerEvent[] = [];
 		let base = state.cursor;
+		let leading: LeadingMode = state.baseline ? { mode: 'suppress' } : { mode: 'report' };
 		if (state.recreatedFrom !== undefined) {
 			// A recreation was reported earlier but the new generation showed no messages yet.
 			leading = { mode: 'recreated', previousCursor: state.recreatedFrom };
 		}
-		let view = await readView(
-			this,
-			`/r/${room}?since=${state.cursor}&limit=${TAIL_LIMIT}&format=json`,
-		);
-		const recreated = isRecreation(state.generation, view.generation);
-		if (recreated) {
-			const previousCursor = state.recreatedFrom ?? state.cursor;
-			events.push({
-				type: 'recreated',
-				fromGeneration: state.generation as number,
-				toGeneration: view.generation as number,
-				previousCursor,
-			});
-			// The new generation may have restarted its sequence, which a since= read cannot
-			// show, so read it from the start.
-			if (state.cursor !== 0)
-				view = await readView(this, `/r/${room}?limit=${TAIL_LIMIT}&format=json`);
-			base = 0;
-			leading = { mode: 'recreated', previousCursor };
+
+		let view: ReadView | undefined;
+		if (state.idle && state.cursor > 0 && !state.baseline && state.recreatedFrom === undefined) {
+			// Nothing was new last time: look at the newest message only.
+			const head = await readView(this, `/r/${room}?limit=1&format=json`);
+			if (head.generation === state.generation) {
+				if (!head.messages.length || head.last_seq === state.cursor) {
+					// Nothing new (an empty view here means every message expired).
+					return null;
+				}
+				if (head.last_seq < state.cursor) {
+					// The newest message is below the cursor under the same generation: the
+					// sequence restarted without a generation bump (for example a store restored
+					// from an older snapshot). A since= read can never show this. Resync from the
+					// start; assemble() emits the reset.
+					leading = { mode: 'recreated', previousCursor: state.cursor };
+					base = 0;
+					view = await readView(this, `/r/${room}?limit=${TAIL_LIMIT}&format=json`);
+				}
+			}
+		}
+		if (!view) {
+			view = await readView(
+				this,
+				`/r/${room}?since=${state.cursor}&limit=${TAIL_LIMIT}&format=json`,
+			);
+			// Before the trigger has emitted anything there is no conversation to have lost.
+			const recreated = !state.baseline && isRecreation(state.generation, view.generation);
+			if (recreated) {
+				const previousCursor = state.recreatedFrom ?? state.cursor;
+				events.push({
+					type: 'recreated',
+					fromGeneration: state.generation as number,
+					toGeneration: view.generation as number,
+					previousCursor,
+				});
+				// The new generation may have restarted its sequence, which a since= read cannot
+				// show, so read it from the start.
+				if (state.cursor !== 0)
+					view = await readView(this, `/r/${room}?limit=${TAIL_LIMIT}&format=json`);
+				base = 0;
+				leading = { mode: 'recreated', previousCursor };
+			}
 		}
 
 		let scan: ExportScan | undefined;
@@ -352,6 +380,7 @@ export class TechnocoreTrigger implements INodeType {
 			scan = exported.scan;
 		}
 
+		const stalls = state.boundedStalls ?? 0;
 		const result = assemble({
 			cursor: base,
 			view,
@@ -359,6 +388,7 @@ export class TechnocoreTrigger implements INodeType {
 			backfillDisabled: backfillNeeded && !backfill,
 			leading,
 			maxMessages,
+			deferBounded: stalls < MAX_BOUNDED_STALLS,
 		});
 		events.push(...result.events);
 
@@ -371,6 +401,13 @@ export class TechnocoreTrigger implements INodeType {
 		}
 		const generation = view.generation ?? state.generation;
 		if (generation !== undefined) nextState.generation = generation;
+		if (state.baseline && result.emittedMessages === 0 && generation !== 0) {
+			nextState.baseline = true;
+		}
+		if (result.deferred && result.emittedMessages === 0) nextState.boundedStalls = stalls + 1;
+		if (!events.length && !result.deferred && nextState.cursor === state.cursor) {
+			nextState.idle = true;
+		}
 		staticData[STATE_KEY] = nextState as unknown as IDataObject;
 
 		if (!events.length) return null;

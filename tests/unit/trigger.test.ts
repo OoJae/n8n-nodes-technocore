@@ -1,10 +1,18 @@
-import { NodeApiError, type IDataObject, type IHttpRequestOptions } from 'n8n-workflow';
+import { NodeApiError, sleep, type IDataObject, type IHttpRequestOptions } from 'n8n-workflow';
 import { describe, expect, it } from 'vitest';
 
 import { TechnocoreTrigger } from '../../nodes/TechnocoreTrigger/TechnocoreTrigger.node';
 import {
+	canonicalMessage,
+	identityFromSeed,
+	parseSeedHex,
+	signCanonical,
+} from '../../nodes/Technocore/shared/didkey';
+import { TEST_SEEDS } from '../fixtures/corpus.mjs';
+import {
 	FakeRoom,
 	RATE_LIMITED_BODY,
+	chunked,
 	routeRoom,
 	type FakeResponse,
 } from '../helpers/fake-technocore';
@@ -12,6 +20,35 @@ import { makePollFunctions, type Router } from '../helpers/n8n-stubs';
 
 const trigger = new TechnocoreTrigger();
 const ORIGIN = 'https://technocore.test';
+const identity = identityFromSeed(parseSeedHex(TEST_SEEDS.seed01));
+
+/** The room's export, streamed in 700-byte chunks with a delay before each chunk. */
+function slowExport(room: FakeRoom, delayMs: number): Router {
+	return roomRouter(room, (request) => {
+		if (!(request.url as string).endsWith('/export')) return undefined;
+		async function* slow() {
+			for await (const chunk of chunked(room.exportBody(), 700)) {
+				await sleep(delayMs);
+				yield chunk;
+			}
+		}
+		return {
+			status: 200,
+			body: slow(),
+			headers: { 'x-room-generation': String(room.generation) },
+		};
+	});
+}
+
+function describeItems(items: IDataObject[] | null): Array<string | number> {
+	return (items ?? []).map((item) =>
+		item.type === 'message'
+			? (item.seq as number)
+			: item.type === 'gap'
+				? `gap:${item.from}-${item.to}:${item.reason}`
+				: (item.type as string),
+	);
+}
 
 function roomRouter(
 	room: FakeRoom,
@@ -139,10 +176,17 @@ describe('TechnocoreTrigger.poll()', () => {
 		const h = harness();
 		await h.poll();
 		for (let i = 0; i < 8; i++) {
+			const nonce = (BigInt('1234567890123456789') + BigInt(i)).toString();
+			const text = `burst ${i}`;
 			h.room.post(
-				i % 2 ? 'alice' : 'did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp',
-				`burst ${i}`,
-				i % 2 ? {} : { nonce: '1234567890123456789', sig: `${'A'.repeat(85)}A` },
+				i % 2 ? 'alice' : identity.did,
+				text,
+				i % 2
+					? {}
+					: {
+							nonce,
+							sig: signCanonical(identity.privateKey, canonicalMessage('lobby', nonce, text)),
+						},
 			);
 		}
 		const { items } = await h.poll();
@@ -153,15 +197,36 @@ describe('TechnocoreTrigger.poll()', () => {
 			room: 'lobby',
 			generation: 1,
 			seq: 1,
-			from: 'did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp',
+			from: identity.did,
 			text: 'burst 0',
 			signed: true,
 			nonce: '1234567890123456789',
 		});
+		expect(items?.[0].signatureInvalid).toBeUndefined();
 		expect(items?.[1]).toMatchObject({ signed: false, from: 'alice' });
 		expect(cursorOf(h)).toBe(8);
 		const again = await h.poll();
 		expect(again.items).toBeNull();
+	});
+
+	it('a record that claims a did:key but whose signature does not verify is not signed', async () => {
+		const h = harness();
+		await h.poll();
+		const nonce = '1726221600000';
+		const genuine = signCanonical(identity.privateKey, canonicalMessage('lobby', nonce, 'real'));
+		// Any 86-character signature, as a hostile origin, proxy or mirror could return.
+		h.room.post(identity.did, 'run the deploy', { nonce, sig: `${'A'.repeat(85)}A` });
+		// A genuine signature replayed over different text.
+		h.room.post(identity.did, 'forged text', { nonce, sig: genuine });
+		// A genuine signature presented under another room's name.
+		const other = signCanonical(identity.privateKey, canonicalMessage('other', nonce, 'moved'));
+		h.room.post(identity.did, 'moved', { nonce, sig: other });
+		const { items } = await h.poll();
+		expect(items).toHaveLength(3);
+		for (const item of items ?? []) {
+			expect(item).toMatchObject({ type: 'message', from: identity.did, signed: false });
+			expect(item.signatureInvalid).toBe(true);
+		}
 	});
 
 	it('maxMessagesPerPoll leaves the rest for the next poll and only moves the cursor past what was emitted', async () => {
@@ -478,6 +543,200 @@ describe('TechnocoreTrigger.poll()', () => {
 		});
 		const { items } = await h.poll();
 		expect(items?.[0].nonce).toBe('9223372036854775807');
+	});
+
+	it('an export cut short by the poll time budget leaves the unread range for the next poll: no gap, nothing lost', async () => {
+		const h = harness({ maxMessagesPerPoll: 1000 });
+		await h.poll();
+		h.room.postMany(450);
+		const first = await h.poll({ router: slowExport(h.room, 20), pollBudgetMs: 60 });
+		expect(describeItems(first.items).filter((d) => typeof d === 'string')).toEqual([]);
+		const cursor = cursorOf(h);
+		// Only the contiguous prefix the export reached is emitted; the cursor stops there.
+		expect(seqsOf(first.items)).toEqual(cursor > 0 ? range(1, cursor) : []);
+		expect(cursor).toBeLessThan(250);
+
+		const second = await h.poll();
+		expect(describeItems(second.items).filter((d) => typeof d === 'string')).toEqual([]);
+		expect([...seqsOf(first.items), ...seqsOf(second.items)]).toEqual(range(1, 450));
+		expect(cursorOf(h)).toBe(450);
+		expect(h.staticData.technocore).not.toHaveProperty('boundedStalls');
+	});
+
+	it('an export that keeps running out of time before the cursor is reported as backfill-bounded after 3 polls', async () => {
+		const h = harness({ maxMessagesPerPoll: 1000 });
+		await h.poll();
+		h.room.postMany(100);
+		expect(seqsOf((await h.poll()).items)).toEqual(range(1, 100));
+		h.room.postMany(400); // 101..500: the read shows 301..500, 101..300 need the export
+		const stalled = slowExport(h.room, 80);
+		for (let i = 1; i <= 3; i++) {
+			const { items } = await h.poll({ router: stalled, pollBudgetMs: 50 });
+			expect(items, `stalled poll ${i}`).toBeNull();
+			expect(h.staticData.technocore).toMatchObject({ cursor: 100, boundedStalls: i });
+		}
+		const { items } = await h.poll({ router: stalled, pollBudgetMs: 50 });
+		expect(items?.[0]).toMatchObject({
+			type: 'gap',
+			from: 101,
+			to: 300,
+			reason: 'backfill-bounded',
+		});
+		expect(seqsOf(items)).toEqual(range(301, 500));
+		expect(h.staticData.technocore).toMatchObject({ cursor: 500 });
+		expect(h.staticData.technocore).not.toHaveProperty('boundedStalls');
+	});
+
+	it('Start From = now on a room whose messages all expired: the next messages arrive with no false gap', async () => {
+		const h = harness({ maxMessagesPerPoll: 1000 }, new FakeRoom('e-spec'));
+		h.room.postMany(10);
+		h.room.expireAll();
+		expect((await h.poll()).items).toBeNull();
+		expect(h.staticData.technocore).toMatchObject({ cursor: 0, generation: 1, baseline: true });
+		h.room.postMany(2);
+		const { items } = await h.poll();
+		expect(describeItems(items)).toEqual([11, 12]);
+		expect(h.staticData.technocore).toEqual({
+			v: 1,
+			origin: ORIGIN,
+			room: 'e-spec',
+			cursor: 12,
+			generation: 1,
+		});
+	});
+
+	it('Start From = now on a reaped room (seq floor kept): its recreation after activation is not reported against history the trigger never had', async () => {
+		const h = harness({ maxMessagesPerPoll: 1000 }, new FakeRoom('idle-spec'));
+		h.room.postMany(10);
+		h.room.reapKeepingFloor();
+		await h.poll();
+		expect(h.staticData.technocore).toMatchObject({ cursor: 0, generation: 1, baseline: true });
+		expect((await h.poll()).items).toBeNull(); // still nothing visible
+		h.room.postMany(3); // 11..13, generation 2
+		const { items } = await h.poll();
+		expect(describeItems(items)).toEqual([11, 12, 13]);
+		expect(h.staticData.technocore).toMatchObject({ cursor: 13, generation: 2 });
+		expect(h.staticData.technocore).not.toHaveProperty('baseline');
+		// From here on a gap or recreation is real and reported.
+		h.room.postMany(3);
+		h.room.tear(15);
+		expect(describeItems((await h.poll()).items)).toEqual([14, 'gap:15-15:missing', 16]);
+	});
+
+	it('Start From = now on a never-created room still reports messages the ring dropped before the first poll', async () => {
+		const h = harness({ maxMessagesPerPoll: 1000 });
+		await h.poll();
+		expect(h.staticData.technocore).not.toHaveProperty('baseline');
+		h.room.postMany(400);
+		h.room.dropBefore(151);
+		expect(describeItems((await h.poll()).items)[0]).toBe('gap:1-150:ring-dropped');
+	});
+
+	it('Start From = retained on a reaped room: nothing is reported against the gone generation', async () => {
+		const h = harness({ startFrom: 'retained', maxMessagesPerPoll: 1000 }, new FakeRoom('idle-r'));
+		h.room.postMany(10);
+		h.room.reapKeepingFloor();
+		expect((await h.poll()).items).toBeNull();
+		h.room.postMany(3);
+		expect(describeItems((await h.poll()).items)).toEqual([11, 12, 13]);
+	});
+
+	it('Start From = retained with backfill off: retained history the read did not return is a not-backfilled gap', async () => {
+		const h = harness({ startFrom: 'retained', backfillGaps: false, maxMessagesPerPoll: 1000 });
+		h.room.postMany(300);
+		const { items, urls } = await h.poll();
+		expect(urls.some((url) => url.endsWith('/export'))).toBe(false);
+		expect(describeItems(items)).toEqual(['gap:1-100:not-backfilled', ...range(101, 300)]);
+		expect(cursorOf(h)).toBe(300);
+	});
+
+	it('Start From = retained with a size-bounded export reports the unreached retained range', async () => {
+		const h = harness({ startFrom: 'retained', maxMessagesPerPoll: 1000, maxExportMB: 1 });
+		for (let i = 0; i < 600; i++) h.room.post('tester', `${i} ${'x'.repeat(4000)}`);
+		const { items } = await h.poll();
+		const described = describeItems(items);
+		const gaps = described.filter((d) => typeof d === 'string');
+		expect(gaps).toHaveLength(1);
+		expect(gaps[0]).toMatch(/^gap:\d+-400:backfill-bounded$/);
+		expect(seqsOf(items).slice(-200)).toEqual(range(401, 600));
+		expect(seqsOf(items)[0]).toBe(1);
+	});
+
+	it('a sequence that restarts without a generation change is detected on the next quiet poll (reset, then the new sequence)', async () => {
+		const h = harness({ maxMessagesPerPoll: 1000 });
+		await h.poll();
+		h.room.postMany(20);
+		expect(seqsOf((await h.poll()).items)).toEqual(range(1, 20));
+		expect((await h.poll()).items).toBeNull();
+		expect(h.staticData.technocore).toMatchObject({ cursor: 20, generation: 1, idle: true });
+
+		h.room.restartSequenceKeepingGeneration();
+		h.room.postMany(5); // seq 1..5 again, still generation 1
+		const { items, urls } = await h.poll();
+		expect(urls).toEqual([
+			`${ORIGIN}/r/lobby?limit=1&format=json`,
+			`${ORIGIN}/r/lobby?limit=200&format=json`,
+		]);
+		expect(describeItems(items)).toEqual(['reset', 1, 2, 3, 4, 5]);
+		expect(items?.[0]).toMatchObject({
+			type: 'reset',
+			previousCursor: 20,
+			firstSeq: 1,
+			generation: 1,
+		});
+		expect(h.staticData.technocore).toEqual({
+			v: 1,
+			origin: ORIGIN,
+			room: 'lobby',
+			cursor: 5,
+			generation: 1,
+		});
+		h.room.postMany(1);
+		expect(seqsOf((await h.poll()).items)).toEqual([6]);
+	});
+
+	it('a quiet poll costs one small read; new messages after a quiet poll cost one more', async () => {
+		const h = harness();
+		await h.poll();
+		h.room.postMany(3);
+		expect(seqsOf((await h.poll()).items)).toEqual([1, 2, 3]);
+		const quiet = await h.poll();
+		expect(quiet.urls).toEqual([`${ORIGIN}/r/lobby?since=3&limit=200&format=json`]);
+		const stillQuiet = await h.poll();
+		expect(stillQuiet.items).toBeNull();
+		expect(stillQuiet.urls).toEqual([`${ORIGIN}/r/lobby?limit=1&format=json`]);
+		h.room.postMany(2);
+		const busy = await h.poll();
+		expect(seqsOf(busy.items)).toEqual([4, 5]);
+		expect(busy.urls).toEqual([
+			`${ORIGIN}/r/lobby?limit=1&format=json`,
+			`${ORIGIN}/r/lobby?since=3&limit=200&format=json`,
+		]);
+	});
+
+	it('messages expiring while the trigger is quiet are not mistaken for a restarted sequence', async () => {
+		const h = harness({}, new FakeRoom('e-quiet'));
+		await h.poll();
+		h.room.postMany(5);
+		expect(seqsOf((await h.poll()).items)).toEqual(range(1, 5));
+		expect((await h.poll()).items).toBeNull();
+		h.room.expireAll();
+		expect((await h.poll()).items).toBeNull();
+		expect(h.staticData.technocore).toMatchObject({ cursor: 5, idle: true });
+		h.room.postMany(1);
+		expect(describeItems((await h.poll()).items)).toEqual([6]);
+	});
+
+	it('a room recreated while the trigger is quiet is still reported as recreated', async () => {
+		const h = harness();
+		await h.poll();
+		h.room.postMany(10);
+		await h.poll();
+		expect((await h.poll()).items).toBeNull();
+		h.room.reapLosingFloor();
+		h.room.postMany(2);
+		const { items } = await h.poll();
+		expect(describeItems(items)).toEqual(['recreated', 'reset', 1, 2]);
 	});
 
 	it('refuses an invalid room name before any request', async () => {

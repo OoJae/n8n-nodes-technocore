@@ -3,7 +3,7 @@
  * real HTTP (including the streamed export) through n8n's outbound client.
  * TEST seeds only; never production.
  */
-import { NodeApiError, type IDataObject } from 'n8n-workflow';
+import { NodeApiError, sleep, type IDataObject } from 'n8n-workflow';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { Technocore } from '../../nodes/Technocore/Technocore.node';
@@ -55,7 +55,12 @@ async function post(origin: string, room: string, count: number, prefix: string)
 	}
 }
 
-function pollerFor(origin: string, params: IDataObject, staticData: IDataObject = {}) {
+function pollerFor(
+	origin: string,
+	params: IDataObject,
+	staticData: IDataObject = {},
+	options: { pollBudgetMs?: number } = {},
+) {
 	const allParams: IDataObject = {
 		startFrom: 'now',
 		maxMessagesPerPoll: 1000,
@@ -73,6 +78,7 @@ function pollerFor(origin: string, params: IDataObject, staticData: IDataObject 
 				staticData,
 				router: realRouter(log),
 				credentials: credentialsFor(origin),
+				pollBudgetMs: options.pollBudgetMs,
 			});
 			const result = await trigger.poll.call(stub.fns);
 			return { items: result ? result[0].map((item) => item.json) : null, log };
@@ -80,6 +86,14 @@ function pollerFor(origin: string, params: IDataObject, staticData: IDataObject 
 	};
 }
 
+const describeItems = (items: IDataObject[] | null) =>
+	(items ?? []).map((i) =>
+		i.type === 'message'
+			? (i.seq as number)
+			: i.type === 'gap'
+				? `gap:${i.from}-${i.to}:${i.reason}`
+				: (i.type as string),
+	);
 const seqs = (items: IDataObject[] | null) =>
 	(items ?? []).filter((i) => i.type === 'message').map((i) => i.seq as number);
 const range = (from: number, to: number) =>
@@ -160,6 +174,53 @@ describe('trigger against a local server', () => {
 				`n8n-trig-signed|${items?.[0].nonce}|signed for the trigger`,
 			),
 		).toBe(true);
+	});
+
+	it('an export cut short by the poll time budget is resumed on the next poll with no gap', async () => {
+		const room = 'n8n-trig-slow';
+		const poller = pollerFor(server.origin, { room });
+		await poller.poll();
+		// ~1.8 MiB: the server streams the export in 64 KiB blocks.
+		for (let i = 1; i <= 450; i++) {
+			const response = await fetch(`${server.origin}/r/${room}?format=json`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ from: 'writer', text: `${i} ${'x'.repeat(4000)}` }),
+			});
+			expect(response.status).toBe(200);
+		}
+		const hurried = pollerFor(server.origin, { room }, poller.staticData, { pollBudgetMs: 2 });
+		const first = await hurried.poll();
+		expect(first.log.map((l) => l.url.replace(server.origin, ''))).toEqual([
+			`/r/${room}?since=0&limit=200&format=json`,
+			`/r/${room}/export`,
+		]);
+		const cursor = (poller.staticData.technocore as IDataObject).cursor as number;
+		expect(describeItems(first.items).filter((d) => typeof d === 'string')).toEqual([]);
+		expect(seqs(first.items)).toEqual(cursor ? range(1, cursor) : []);
+		expect(cursor).toBeLessThan(250);
+
+		const second = await poller.poll();
+		expect(describeItems(second.items).filter((d) => typeof d === 'string')).toEqual([]);
+		expect([...seqs(first.items), ...seqs(second.items)]).toEqual(range(1, 450));
+	});
+
+	it('a quiet poll reads only the newest message', async () => {
+		const room = 'n8n-trig-quiet';
+		const poller = pollerFor(server.origin, { room });
+		await poller.poll();
+		await post(server.origin, room, 2, 'quiet');
+		expect(seqs((await poller.poll()).items)).toEqual([1, 2]);
+		expect((await poller.poll()).items).toBeNull();
+		const quiet = await poller.poll();
+		expect(quiet.items).toBeNull();
+		expect(quiet.log.map((l) => l.url.replace(server.origin, ''))).toEqual([
+			`/r/${room}?limit=1&format=json`,
+		]);
+		await post(server.origin, room, 1, 'after quiet');
+		const busy = await poller.poll();
+		expect(seqs(busy.items)).toEqual([3]);
+		expect(busy.log).toHaveLength(2);
 	});
 
 	it('manual mode shows the newest messages without moving the cursor', async () => {
@@ -250,6 +311,97 @@ describe('trigger across room recreation (server stopped, store mutated, restart
 	});
 });
 
+describe('trigger activation on rooms with nothing visible', () => {
+	const root = makeRoot();
+	let server: Server;
+
+	afterAll(async () => {
+		await server?.stop();
+		removeRoot(root);
+	});
+
+	it('Start From = now on an ephemeral room whose messages expired: no false gap', async () => {
+		server = await startTechnocore({ root, env: { CHAT_EPHEMERAL_TTL_SECONDS: '2' } });
+		const room = 'e-n8n-spec';
+		await post(server.origin, room, 10, 'will expire');
+		await sleep(3200);
+		const poller = pollerFor(server.origin, { room });
+		expect((await poller.poll()).items).toBeNull();
+		expect(poller.staticData.technocore).toMatchObject({
+			cursor: 0,
+			generation: 1,
+			baseline: true,
+		});
+		await post(server.origin, room, 2, 'after activation');
+		const { items } = await poller.poll();
+		expect(describeItems(items)).toEqual([11, 12]);
+		expect(poller.staticData.technocore).toMatchObject({ cursor: 12, generation: 1 });
+		expect(poller.staticData.technocore).not.toHaveProperty('baseline');
+	});
+
+	it('Start From = now on a reaped room (seq floor kept): the recreation after activation reports nothing false', async () => {
+		const room = 'n8n-idle-spec';
+		await post(server.origin, room, 10, 'before reap');
+		const port = server.port;
+		await server.stop();
+		mutateStore(
+			root,
+			room,
+			'store._set_seq_entry(root, room, store.last_seq(root, room)); store.room_path(root, room).unlink()',
+		);
+		server = await startTechnocore({ root, port });
+		const poller = pollerFor(server.origin, { room });
+		expect((await poller.poll()).items).toBeNull();
+		expect(poller.staticData.technocore).toMatchObject({
+			cursor: 0,
+			generation: 1,
+			baseline: true,
+		});
+		await post(server.origin, room, 3, 'after activation');
+		const { items } = await poller.poll();
+		expect(describeItems(items)).toEqual([11, 12, 13]);
+		expect(poller.staticData.technocore).toMatchObject({ cursor: 13, generation: 2 });
+	});
+
+	it('Start From = retained with backfill off reports retained history beyond the read as not-backfilled', async () => {
+		const room = 'n8n-retained-nobf';
+		await post(server.origin, room, 230, 'retained');
+		const poller = pollerFor(server.origin, { room, startFrom: 'retained', backfillGaps: false });
+		const { items, log } = await poller.poll();
+		expect(log.some((l) => l.url.endsWith('/export'))).toBe(false);
+		expect(describeItems(items)).toEqual(['gap:1-30:not-backfilled', ...range(31, 230)]);
+	});
+});
+
+describe('trigger when the origin restarts its sequence under the same generation', () => {
+	let server: Server;
+
+	afterAll(async () => {
+		await server?.stop();
+	});
+
+	it('a fresh store on the same origin (generation 1 again, seq below the cursor) is a reset on the next quiet poll', async () => {
+		server = await startTechnocore();
+		const room = 'n8n-regress';
+		const poller = pollerFor(server.origin, { room });
+		await poller.poll();
+		await post(server.origin, room, 10, 'old store');
+		expect(seqs((await poller.poll()).items)).toEqual(range(1, 10));
+		expect((await poller.poll()).items).toBeNull();
+		expect(poller.staticData.technocore).toMatchObject({ cursor: 10, generation: 1, idle: true });
+
+		const port = server.port;
+		await server.stop(); // its temporary root is removed
+		server = await startTechnocore({ port });
+		await post(server.origin, room, 3, 'new store');
+		const { items } = await poller.poll();
+		expect(describeItems(items)).toEqual(['reset', 1, 2, 3]);
+		expect(items?.[0]).toMatchObject({ previousCursor: 10, firstSeq: 1, generation: 1 });
+		await post(server.origin, room, 5, 'new store more');
+		expect(seqs((await poller.poll()).items)).toEqual(range(4, 8));
+	});
+});
+
 describe('trigger under a real 429', () => {
 	let server: Server;
 
@@ -270,10 +422,9 @@ describe('trigger under a real 429', () => {
 		for (let i = 0; i < 4 && !error; i++) {
 			try {
 				const { items } = await poller.poll();
-				if (items) {
-					expect(seqs(items)).toEqual([1, 2]);
-					Object.assign(before, structuredClone(poller.staticData));
-				}
+				if (items) expect(seqs(items)).toEqual([1, 2]);
+				// A successful poll may update the state; only the refused one must not.
+				Object.assign(before, structuredClone(poller.staticData));
 			} catch (caught) {
 				error = caught;
 			}

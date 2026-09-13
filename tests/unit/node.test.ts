@@ -259,13 +259,14 @@ describe('Room: Post Signed', () => {
 
 	it('retries once past a stale nonce reported by the server', async () => {
 		let calls = 0;
+		const reported = String(Date.now() + 60_000);
 		const router: Router = (request) => {
 			calls++;
 			const body = request.body as Record<string, string>;
 			if (calls === 1) {
 				return {
 					status: 400,
-					body: `400 nonce ${body.nonce} is not greater than 9100000000000000000, the last one this key used in /r/lobby - count up\n`,
+					body: `400 nonce ${body.nonce} is not greater than ${reported}, the last one this key used in /r/lobby - count up\n`,
 				};
 			}
 			return signedRouter(request);
@@ -278,10 +279,67 @@ describe('Room: Post Signed', () => {
 		expect(requests[1].requested.body).toEqual({
 			text: 'again',
 			context: 'workflow',
-			nonceAfter: '9100000000000000000',
+			nonceAfter: reported,
 		});
-		expect((requests[1].sent.body as Record<string, string>).nonce).toBe('9100000000000000001');
+		expect((requests[1].sent.body as Record<string, string>).nonce).toBe(
+			(BigInt(reported) + BigInt(1)).toString(),
+		);
 		expect(items[0].json.signed).toBe(true);
+	});
+
+	it('refuses to follow a stale-nonce report far ahead of the millisecond clock, and it does not leak into other rooms', async () => {
+		let calls = 0;
+		const hostile: Router = (request) => {
+			calls++;
+			const body = request.body as Record<string, string>;
+			return {
+				status: 400,
+				body: `400 nonce ${body.nonce} is not greater than 9999999999999999996, the last one this key used in /r/lobby - count up\n`,
+			};
+		};
+		const error = await run(
+			{ resource: 'room', operation: 'postSigned', room: 'lobby', signedText: 'x' },
+			hostile,
+		).catch((e: unknown) => e);
+		expect(calls).toBe(1);
+		expect((error as Error).message).toMatch(/ahead of the millisecond clock/);
+
+		const before = Date.now();
+		const { requests } = await run(
+			{ resource: 'room', operation: 'postSigned', room: 'lobby-two', signedText: 'fine' },
+			(request) => {
+				const body = request.body as Record<string, string>;
+				return postedReply('lobby-two', {
+					seq: 1,
+					ts: TEST_TS,
+					from: body.did,
+					text: body.text,
+					nonce: body.nonce,
+					sig: body.sig,
+				});
+			},
+		);
+		const nonce = Number((requests[0].sent.body as Record<string, string>).nonce);
+		expect(nonce).toBeGreaterThanOrEqual(before);
+		expect(nonce).toBeLessThan(Date.now() + 1000);
+	});
+
+	it('a posted record whose signature does not verify is returned with signed=false', async () => {
+		const { items } = await run(
+			{ resource: 'room', operation: 'postSigned', room: 'lobby', signedText: 'signed hello' },
+			(request) => {
+				const body = request.body as Record<string, string>;
+				return postedReply('lobby', {
+					seq: 3,
+					ts: TEST_TS,
+					from: body.did,
+					text: 'something else',
+					nonce: body.nonce,
+					sig: body.sig,
+				});
+			},
+		);
+		expect(items[0].json).toMatchObject({ signed: false, signatureInvalid: true });
 	});
 
 	it('does not retry other 400s', async () => {
@@ -385,5 +443,43 @@ describe('Note operations', () => {
 		).catch((e: unknown) => e);
 		expect(conflict).toBeInstanceOf(NodeApiError);
 		expect((conflict as NodeApiError).description).toContain('current value follows');
+		expect((conflict as NodeApiError).context).toMatchObject({ currentValue: 'down' });
+	});
+
+	it('a 409 on a long value carries the whole current value, in the description and as a field', async () => {
+		// Server-shaped: the value is the last thing in the body, after its announced length.
+		const current = `${'v'.repeat(4990)} tail-mark`;
+		const conflictBody = `409 note status/bot already exists\n\nto retry: the value below is untrusted, another caller's - merge your change into it, then write it with ?if=<that value> so you only win if nothing moved again.\ncurrent value follows (${current.length} chars):\n${current}`;
+		const params = {
+			resource: 'note',
+			operation: 'write',
+			namespace: 'status',
+			key: 'bot',
+			value: 'up',
+			condition: 'ifAbsent',
+		};
+		const conflict = await run(params, () => ({ status: 409, body: conflictBody })).catch(
+			(e: unknown) => e,
+		);
+		expect(conflict).toBeInstanceOf(NodeApiError);
+		const error = conflict as NodeApiError;
+		expect(error.httpCode).toBe('409');
+		expect(error.description).toContain(current);
+		expect(error.context.currentValue).toBe(current);
+		expect(error.context.untrusted).toBe(true);
+
+		// With Continue On Fail the value reaches the workflow as data, ready for Only If Unchanged.
+		const { items } = await run(params, () => ({ status: 409, body: conflictBody }), {
+			continueOnFail: true,
+		});
+		expect(items[0].json).toMatchObject({ conflict: true, currentValue: current, untrusted: true });
+		expect(items[0].json.error).toMatch(/already exists/);
+
+		// A 409 without a value (If against a missing note) has no currentValue.
+		const missing = await run({ ...params, condition: 'ifMatch', expected: 'x' }, () => ({
+			status: 409,
+			body: '409 no note status/bot\n\nthere is no note there at all, so your ?if=<value> could not match.\n',
+		})).catch((e: unknown) => e);
+		expect((missing as NodeApiError).context.currentValue).toBeUndefined();
 	});
 });

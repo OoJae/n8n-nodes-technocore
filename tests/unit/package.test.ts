@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { check } from '../../scripts/vendor-core.mjs';
-import { findHexSecrets, loadAllowList, scan } from '../../scripts/secret-scan.mjs';
-import { exampleWorkflows, readRepoFile } from '../harness/repo-files.mjs';
+import {
+	findHexSecrets,
+	findHexSecretsInBuffer,
+	loadAllowList,
+	scan,
+} from '../../scripts/secret-scan.mjs';
+import { exampleWorkflows, readRepoFile, repoFileExists } from '../harness/repo-files.mjs';
+import { withTempGitRepo } from '../harness/temp-git-repo.mjs';
 
 const pkg = JSON.parse(readRepoFile('package.json'));
 
@@ -66,6 +72,74 @@ describe('secret scan', () => {
 		expect(findHexSecrets(`short ${'ef'.repeat(31)} run`, allowed)).toHaveLength(0);
 		expect(findHexSecrets(`seed ${'01'.repeat(32)}`, allowed)).toHaveLength(0);
 		for (const label of allowed.values()) expect(label).toMatch(/TEST/);
+	});
+
+	it('also finds hex runs in UTF-16 (LE, BE, with or without BOM) and binary files', () => {
+		const allowed = loadAllowList();
+		const synthetic = 'ab'.repeat(32);
+		const text = `SEED=${synthetic}\r\n`;
+		const le = Buffer.from(text, 'utf16le');
+		const be = Buffer.from(le).swap16();
+		const cases: Record<string, Buffer> = {
+			'utf-16le': le,
+			'utf-16le with BOM': Buffer.concat([Buffer.from([0xff, 0xfe]), le]),
+			'utf-16be': be,
+			'utf-16be with BOM': Buffer.concat([Buffer.from([0xfe, 0xff]), be]),
+			binary: Buffer.concat([
+				Buffer.from([0, 1, 2, 0, 255]),
+				Buffer.from(synthetic),
+				Buffer.alloc(9000),
+			]),
+			'binary, seed after 8000 NUL bytes': Buffer.concat([
+				Buffer.alloc(8000),
+				Buffer.from(text, 'utf16le'),
+			]),
+		};
+		for (const [name, buffer] of Object.entries(cases)) {
+			expect(findHexSecretsInBuffer(buffer, allowed), name).toHaveLength(1);
+		}
+		const allowedSeed = Buffer.from(`seed ${'01'.repeat(32)}`, 'utf16le');
+		expect(findHexSecretsInBuffer(allowedSeed, allowed)).toHaveLength(0);
+		expect(findHexSecretsInBuffer(Buffer.from(`plain ${synthetic}`), allowed)).toHaveLength(1);
+	});
+
+	it('refuses a staged UTF-16 file holding a hex seed (the pre-commit path) and scans the given root', () => {
+		withTempGitRepo(({ root, write, git }) => {
+			write('.secret-scan-allow.json', readRepoFile('.secret-scan-allow.json'));
+			write('clean.txt', 'nothing here\n');
+			git('add', '.');
+			expect(scan({ staged: true, root }).problems).toEqual([]);
+			const notes = Buffer.concat([
+				Buffer.from([0xff, 0xfe]),
+				Buffer.from(`key: ${'cd'.repeat(32)}\r\n`, 'utf16le'),
+			]);
+			write('notes.txt', notes);
+			git('add', 'notes.txt');
+			const staged = scan({ staged: true, root });
+			expect(staged.problems).toHaveLength(1);
+			expect(staged.problems[0]).toMatchObject({ file: 'notes.txt', line: 1, length: 64 });
+			expect(JSON.stringify(staged.problems)).not.toContain('cd'.repeat(32));
+			expect(scan({ root }).problems).toHaveLength(1);
+		});
+	});
+});
+
+describe('README commands', () => {
+	it('runs every script with the interpreter its file is written for', () => {
+		const readme = readRepoFile('README.md');
+		const nodeScripts = [...readme.matchAll(/`node (scripts\/[^\s`]+)/g)].map((m) => m[1]);
+		expect(nodeScripts.length).toBeGreaterThan(0);
+		for (const script of nodeScripts) {
+			expect(script, script).toMatch(/\.(mjs|js|cjs)$/);
+			expect(repoFileExists(script), script).toBe(true);
+		}
+		const pythonCommands = [...readme.matchAll(/`([^`]*scripts\/gen-sweep-table\.py[^`]*)`/g)].map(
+			(m) => m[1],
+		);
+		expect(pythonCommands.some((c) => /uv run python .*scripts\/gen-sweep-table\.py/.test(c))).toBe(
+			true,
+		);
+		for (const command of pythonCommands) expect(command).not.toMatch(/(^|\s)node\s/);
 	});
 });
 

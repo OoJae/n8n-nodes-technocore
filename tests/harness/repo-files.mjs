@@ -1,11 +1,15 @@
 // File access for repository-level tests (never shipped).
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import { PACKAGE_ROOT } from './python.mjs';
 
 export function readRepoFile(relative) {
 	return readFileSync(path.join(PACKAGE_ROOT, relative), 'utf8');
+}
+
+export function repoFileExists(relative) {
+	return existsSync(path.join(PACKAGE_ROOT, relative));
 }
 
 export function exampleWorkflows() {

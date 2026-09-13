@@ -11,6 +11,7 @@ import {
 import {
 	authenticateSigningRequest,
 	nextNonce,
+	nonceCounterCountForTests,
 	resetNonceClockForTests,
 } from '../../nodes/Technocore/shared/signing';
 import { TEST_SEEDS, cp } from '../fixtures/corpus.mjs';
@@ -181,17 +182,72 @@ describe('TechnocoreSigningKeyApi credential', () => {
 });
 
 describe('nonce clock', () => {
-	it('is a millisecond clock that strictly increases within the process', () => {
-		expect(nextNonce(NOW)).toBe(String(NOW));
-		expect(nextNonce(NOW)).toBe(String(NOW + 1));
-		expect(nextNonce(NOW - 5000)).toBe(String(NOW + 2));
-		expect(nextNonce(NOW + 100)).toBe(String(NOW + 100));
+	const A = 'https://technocore.test|did:key:z6MkA|lobby';
+	const B = 'https://technocore.test|did:key:z6MkA|other';
+	const DAY = 24 * 60 * 60 * 1000;
+
+	it('is a millisecond clock that strictly increases per origin, key and room', () => {
+		expect(nextNonce(A, NOW)).toBe(String(NOW));
+		expect(nextNonce(A, NOW)).toBe(String(NOW + 1));
+		expect(nextNonce(A, NOW - 5000)).toBe(String(NOW + 2));
+		expect(nextNonce(A, NOW + 100)).toBe(String(NOW + 100));
+		// Another room (or key, or origin) has its own counter.
+		expect(nextNonce(B, NOW)).toBe(String(NOW));
 	});
 
-	it('jumps past a higher nonce the server reported, staying within 19 digits', () => {
-		expect(nextNonce(NOW, '9000000000000000000')).toBe('9000000000000000001');
-		expect(nextNonce(NOW)).toBe('9000000000000000002');
-		expect(() => nextNonce(NOW, '9999999999999999999')).toThrow(/19 digits/);
+	it('jumps past a higher nonce the server reported, for that room only', () => {
+		const reported = String(NOW + 3_600_000);
+		expect(nextNonce(A, NOW, reported)).toBe(String(NOW + 3_600_001));
+		expect(nextNonce(A, NOW)).toBe(String(NOW + 3_600_002));
+		expect(nextNonce(B, NOW)).toBe(String(NOW));
+	});
+
+	it('refuses a reported nonce more than a day ahead of the clock, without moving any counter', () => {
+		expect(nextNonce(A, NOW, String(NOW + DAY - 1))).toBe(String(NOW + DAY));
+		resetNonceClockForTests();
+		for (const reported of ['1726221600000000000', '9999999999999999996', String(NOW + DAY)]) {
+			expect(() => nextNonce(A, NOW, reported)).toThrow(/ahead of the millisecond clock/);
+		}
+		expect(nextNonce(A, NOW)).toBe(String(NOW));
+		expect(() => nextNonce(A, NOW, '12345678901234567890')).toThrow(/1-19 digits/);
+		expect(() => nextNonce(A, 1e19)).toThrow(/19 digits/);
+	});
+
+	it('keeps a bounded number of counters, dropping ones the clock has caught up with first', () => {
+		nextNonce(A, NOW + 50_000); // still ahead of the clock used below
+		for (let i = 0; i < 20_000; i++) nextNonce(`o|d|room-${i}`, NOW);
+		expect(nonceCounterCountForTests()).toBeLessThanOrEqual(10_000);
+		expect(nextNonce(A, NOW)).toBe(String(NOW + 50_001));
+		// The most recent counters are kept too.
+		expect(nextNonce('o|d|room-19999', NOW)).toBe(String(NOW + 1));
+	});
+
+	it('a retry after a report in one room does not raise nonces the credential signs in another', async () => {
+		const reported = String(NOW + 60_000);
+		const retried = await authenticateSigningRequest(
+			{ ...creds },
+			post({ text: 'x', context: 'workflow', nonceAfter: reported }),
+			() => NOW,
+		);
+		expect((retried.body as Record<string, string>).nonce).toBe(String(NOW + 60_001));
+		const elsewhere = await authenticateSigningRequest(
+			{ ...creds },
+			post({ text: 'x', context: 'workflow' }, { url: '/r/other-room?format=json' }),
+			() => NOW,
+		);
+		expect((elsewhere.body as Record<string, string>).nonce).toBe(String(NOW));
+		const otherKey = await authenticateSigningRequest(
+			{ ...creds, privateKeySeed: TEST_SEEDS.seed02 },
+			post({ text: 'x', context: 'workflow' }),
+			() => NOW,
+		);
+		expect((otherKey.body as Record<string, string>).nonce).toBe(String(NOW));
+		const sameRoom = await authenticateSigningRequest(
+			{ ...creds },
+			post({ text: 'x', context: 'workflow' }),
+			() => NOW,
+		);
+		expect((sameRoom.body as Record<string, string>).nonce).toBe(String(NOW + 60_002));
 	});
 });
 

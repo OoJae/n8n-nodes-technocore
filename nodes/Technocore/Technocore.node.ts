@@ -108,10 +108,17 @@ export class Technocore implements INodeType {
 				}
 			} catch (error) {
 				if (this.continueOnFail()) {
-					returnData.push({
-						json: { error: error instanceof Error ? error.message : String(error) },
-						pairedItem: { item: itemIndex },
-					});
+					const json: IDataObject = {
+						error: error instanceof Error ? error.message : String(error),
+					};
+					const context = (error as { context?: IDataObject } | undefined)?.context;
+					if (context && typeof context.currentValue === 'string') {
+						// A lost conditional note write: the value to rebase on (another caller's).
+						json.conflict = true;
+						json.currentValue = context.currentValue;
+						json.untrusted = true;
+					}
+					returnData.push({ json, pairedItem: { item: itemIndex } });
 					continue;
 				}
 				throw asNodeError(this, error, itemIndex);

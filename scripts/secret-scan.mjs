@@ -6,6 +6,10 @@
 //   node scripts/secret-scan.mjs            scan every tracked file (CI, tests)
 //   node scripts/secret-scan.mjs --staged   scan the staged content (pre-commit hook)
 //
+// Every file is scanned, text or binary: as UTF-8 (which keeps ASCII runs inside binary
+// data), and, when it holds NUL bytes, also as UTF-16 in both byte orders, so a seed saved
+// by a tool that writes UTF-16 (a PowerShell redirect, an editor's "Unicode") is found too.
+//
 // Never prints a matched value: only the file, line and a short prefix.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -16,8 +20,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALLOW_FILE = '.secret-scan-allow.json';
 const HEX_RUN = /(?<![0-9a-fA-F])[0-9a-fA-F]{64,}(?![0-9a-fA-F])/g;
 
-function git(args, options = {}) {
-	return execFileSync('git', args, { cwd: ROOT, maxBuffer: 256 * 1024 * 1024, ...options });
+function git(args, root = ROOT) {
+	return execFileSync('git', args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
 }
 
 export function loadAllowList(root = ROOT) {
@@ -55,28 +59,43 @@ export function findHexSecrets(text, allowed) {
 	return findings;
 }
 
-function isProbablyBinary(buffer) {
-	return buffer.subarray(0, 8000).includes(0);
+/**
+ * Findings in raw file content. UTF-16 code units for ASCII hex digits always contain a NUL
+ * byte, so the UTF-16 decodings (little-endian at offset 0, big-endian as little-endian at
+ * offset 1) are only needed, and only tried, when the content has one.
+ */
+export function findHexSecretsInBuffer(buffer, allowed) {
+	const texts = [{ encoding: 'utf-8', text: buffer.toString('utf8') }];
+	if (buffer.includes(0)) {
+		texts.push({ encoding: 'utf-16le', text: buffer.toString('utf16le') });
+		texts.push({ encoding: 'utf-16be', text: buffer.subarray(1).toString('utf16le') });
+	}
+	const findings = [];
+	for (const { encoding, text } of texts) {
+		for (const finding of findHexSecrets(text, allowed)) {
+			findings.push(encoding === 'utf-8' ? finding : { ...finding, encoding });
+		}
+	}
+	return findings;
 }
 
 export function scan({ staged = false, root = ROOT } = {}) {
 	const allowed = loadAllowList(root);
 	const files = staged
-		? git(['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'])
+		? git(['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'], root)
 				.toString('utf8')
 				.split('\0')
 				.filter(Boolean)
-		: git(['ls-files', '-z']).toString('utf8').split('\0').filter(Boolean);
+		: git(['ls-files', '-z'], root).toString('utf8').split('\0').filter(Boolean);
 	const problems = [];
 	for (const file of files) {
 		let content;
 		try {
-			content = staged ? git(['show', `:${file}`]) : readFileSync(path.join(root, file));
+			content = staged ? git(['show', `:${file}`], root) : readFileSync(path.join(root, file));
 		} catch {
 			continue; // deleted in the working tree but still tracked
 		}
-		if (isProbablyBinary(content)) continue;
-		for (const finding of findHexSecrets(content.toString('utf8'), allowed)) {
+		for (const finding of findHexSecretsInBuffer(content, allowed)) {
 			problems.push({ file, ...finding });
 		}
 	}
@@ -90,7 +109,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 			'secret-scan: refusing hex strings of 64+ characters that are not allow-listed test vectors:',
 		);
 		for (const p of problems)
-			console.error(`  ${p.file}:${p.line}  ${p.prefix} (${p.length} hex chars)`);
+			console.error(
+				`  ${p.file}:${p.line}  ${p.prefix} (${p.length} hex chars${p.encoding ? `, ${p.encoding}` : ''})`,
+			);
 		console.error(
 			`If one is a public TEST vector, add it to ${ALLOW_FILE} with a label containing "test".`,
 		);

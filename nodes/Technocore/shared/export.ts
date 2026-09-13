@@ -18,6 +18,11 @@ export interface ExportScan {
 	lastSeenSeq?: number;
 	/** True when the byte or time budget cut the scan short. */
 	bounded: boolean;
+	/**
+	 * Which budget cut it short. `time` can succeed on a later poll; `bytes` cannot (the
+	 * export always starts at the ring's oldest record).
+	 */
+	boundedBy?: 'bytes' | 'time';
 	bytes: number;
 }
 
@@ -80,11 +85,14 @@ export async function scanExport(body: unknown, options: ExportScanOptions): Pro
 			for await (const chunk of body) {
 				consumeChunk(chunk);
 				if (done) break;
-				if (
-					scan.bytes > options.maxBytes ||
-					(options.deadline !== undefined && now() > options.deadline)
-				) {
+				if (scan.bytes > options.maxBytes) {
 					scan.bounded = true;
+					scan.boundedBy = 'bytes';
+					break;
+				}
+				if (options.deadline !== undefined && now() > options.deadline) {
+					scan.bounded = true;
+					scan.boundedBy = 'time';
 					break;
 				}
 			}
@@ -101,7 +109,10 @@ export async function scanExport(body: unknown, options: ExportScanOptions): Pro
 			const cut = prefix.lastIndexOf(0x0a);
 			consumeChunk(cut >= 0 ? prefix.subarray(0, cut + 1) : Buffer.alloc(0));
 			scan.bytes = bytes;
-			if (!done) scan.bounded = true;
+			if (!done) {
+				scan.bounded = true;
+				scan.boundedBy = 'bytes';
+			}
 		} else {
 			consumeChunk(text);
 		}

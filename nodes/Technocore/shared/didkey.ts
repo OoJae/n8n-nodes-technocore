@@ -121,12 +121,17 @@ export function verifyCanonical(did: string, signature: string, canonical: strin
 		return false;
 	}
 	if (!/^[A-Za-z0-9_-]{85}[AQgw]$/.test(signature)) return false;
-	const key = createPublicKey({
-		key: Buffer.concat([SPKI_ED25519_PREFIX, publicKey]),
-		format: 'der',
-		type: 'spki',
-	});
-	return verify(null, Buffer.from(canonical, 'utf8'), key, Buffer.from(signature, 'base64url'));
+	try {
+		const key = createPublicKey({
+			key: Buffer.concat([SPKI_ED25519_PREFIX, publicKey]),
+			format: 'der',
+			type: 'spki',
+		});
+		return verify(null, Buffer.from(canonical, 'utf8'), key, Buffer.from(signature, 'base64url'));
+	} catch {
+		// A public key or signature the crypto library cannot even parse does not verify.
+		return false;
+	}
 }
 
 /** Where a DID's identity note lives: /kv/did-<fp[:2]>/<fp[2:]>, fp = sha256(did)[:16]. */

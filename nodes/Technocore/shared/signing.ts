@@ -29,33 +29,84 @@ export class SigningRefusedError extends Error {
 }
 
 const MAX_NONCE = BigInt('9999999999999999999');
-let lastNonce = BigInt(0);
+/**
+ * How far past the millisecond clock a server-reported last nonce may move a counter: one
+ * day, room for clock skew and bursts. Anything further is not a millisecond nonce.
+ */
+export const MAX_REPORTED_NONCE_AHEAD_MS = 24 * 60 * 60 * 1000;
+/** Counters kept at once; see rememberNonce. */
+const MAX_COUNTERS = 10_000;
+/**
+ * The last nonce issued per `origin|did|room`. The server checks nonces per key per room,
+ * so that is the scope of a counter: a report from one room (or origin, or key) never
+ * raises the nonces used anywhere else.
+ */
+const lastNonces = new Map<string, bigint>();
+
+export function nonceScope(origin: string, did: string, room: string): string {
+	return `${origin}|${did}|${room}`;
+}
+
+function rememberNonce(scope: string, nonce: bigint, clock: bigint): void {
+	lastNonces.delete(scope);
+	lastNonces.set(scope, nonce);
+	if (lastNonces.size <= MAX_COUNTERS) return;
+	// Prune to 90% so this pass is rare. First the counters the clock has passed (the clock
+	// alone now gives a higher nonce), then, oldest first, those it has reached, and only
+	// then anything else. Forgetting a counter costs at most one stale-nonce retry.
+	const target = Math.floor(MAX_COUNTERS * 0.9);
+	const passes: Array<(value: bigint) => boolean> = [
+		(value) => value < clock,
+		(value) => value <= clock,
+		() => true,
+	];
+	for (const evictable of passes) {
+		for (const [key, value] of lastNonces) {
+			if (lastNonces.size <= target) return;
+			if (key !== scope && evictable(value)) lastNonces.delete(key);
+		}
+	}
+}
 
 /**
- * A millisecond clock bumped past the last value this process issued (the MCP server's
- * discipline, so one key can be used from both), and past `after` when the server has
- * reported a higher last nonce for this key in this room.
+ * A millisecond clock bumped past the last nonce issued in this scope (the MCP server's
+ * discipline, so one key can be used from both), and past `after` when the server reported
+ * a higher last nonce for this key in this room. A reported nonce more than a day ahead of
+ * the clock is refused rather than followed: adopting a nanosecond or custom counter would
+ * lock millisecond-clock clients using the same key out of that room, and a misbehaving
+ * origin could push the counter to the 19-digit limit.
  */
-export function nextNonce(nowMs: number, after?: string): string {
-	let candidate = BigInt(Math.max(0, Math.floor(nowMs)));
-	const bumped = lastNonce + BigInt(1);
-	if (bumped > candidate) candidate = bumped;
+export function nextNonce(scope: string, nowMs: number, after?: string): string {
+	const clock = BigInt(Math.max(0, Math.floor(nowMs)));
+	let candidate = clock;
+	const last = lastNonces.get(scope);
+	if (last !== undefined && last + BigInt(1) > candidate) candidate = last + BigInt(1);
 	if (after !== undefined) {
 		if (!/^[0-9]{1,19}$/.test(after))
 			throw new SigningRefusedError('nonceAfter must be 1-19 digits');
 		const past = BigInt(after) + BigInt(1);
+		if (past > clock + BigInt(MAX_REPORTED_NONCE_AHEAD_MS)) {
+			throw new SigningRefusedError(
+				`The server reports that this key last used nonce ${after} in this room, more than a day ahead of the millisecond clock. That is not a millisecond nonce (another client with this key may use a nanosecond or custom counter, or the origin misbehaves), so the credential will not follow it: doing so would lock millisecond-clock clients with this key, such as the Technocore MCP server, out of the room. Use another room or key, or wait until those records leave the room.`,
+			);
+		}
 		if (past > candidate) candidate = past;
 	}
 	if (candidate > MAX_NONCE) {
 		throw new SigningRefusedError('No nonce left: the next nonce would exceed 19 digits');
 	}
-	lastNonce = candidate;
+	rememberNonce(scope, candidate, clock);
 	return candidate.toString();
 }
 
-/** Test hook: forget the process nonce high-water mark. */
+/** Test hook: forget every nonce counter. */
 export function resetNonceClockForTests(): void {
-	lastNonce = BigInt(0);
+	lastNonces.clear();
+}
+
+/** Test hook: how many nonce counters are kept. */
+export function nonceCounterCountForTests(): number {
+	return lastNonces.size;
 }
 
 export interface SigningCredentialData {
@@ -144,7 +195,7 @@ export async function authenticateSigningRequest(
 			`The message is ${length} characters after the sweep; the limit is ${MAX_TEXT_CHARS}. Split it.`,
 		);
 	}
-	const nonce = nextNonce(now(), nonceAfter);
+	const nonce = nextNonce(nonceScope(origin, identity.did, room), now(), nonceAfter);
 	const sig = signCanonical(identity.privateKey, canonicalMessage(room, nonce, swept));
 	const headers = { ...(requestOptions.headers ?? {}), 'Content-Type': 'application/json' };
 	return {

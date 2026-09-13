@@ -74,6 +74,15 @@ export class FakeRoom {
 		this.recreatePending = true;
 	}
 
+	/**
+	 * File and seq state lost without a generation bump (a store restored from an older
+	 * snapshot, or a lost bump): seq restarts at 1 under the same generation number.
+	 */
+	restartSequenceKeepingGeneration(): void {
+		this.records = [];
+		this.lastSeq = 0;
+	}
+
 	read(since: number | undefined, limit: number): string {
 		const bounded = Math.max(1, Math.min(limit, 200));
 		const newer = this.records.filter((record) => since === undefined || record.seq > since);

@@ -141,10 +141,11 @@ describe('Post Signed against the local server', () => {
 	});
 
 	it('recovers from a higher nonce used elsewhere with the same key (retry past the reported nonce)', async () => {
-		// Another client (e.g. the MCP server) signed with a far-future nonce in this room.
+		// Another millisecond-clock client with this key (e.g. the MCP server on a machine whose
+		// clock runs ahead) signed in this room with a nonce ten minutes in the future.
 		const room = 'n8n-it-nonce';
-		const nonce = '9000000000000000000';
-		const text = 'posted by another client with a huge nonce';
+		const nonce = String(Date.now() + 600_000);
+		const text = 'posted by another client slightly ahead';
 		const response = await fetch(`${server.origin}/r/${room}?format=json`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -164,12 +165,51 @@ describe('Post Signed against the local server', () => {
 			signedText: 'n8n catches up',
 		});
 		expect(log.map((l) => l.status)).toEqual([400, 200]);
-		expect(items[0].nonce).toBe('9000000000000000001');
+		const expected = (BigInt(nonce) + BigInt(1)).toString();
+		expect(items[0].nonce).toBe(expected);
+		expect(items[0].signed).toBe(true);
 		const view = await readRoom(room);
-		expect(view.messages.map((m) => m.nonce)).toEqual([
-			'9000000000000000000',
-			'9000000000000000001',
-		]);
+		expect(view.messages.map((m) => m.nonce)).toEqual([nonce, expected]);
+
+		// The catch-up stays in that room: a post elsewhere uses the plain millisecond clock.
+		const before = Date.now();
+		const elsewhere = await run({
+			resource: 'room',
+			operation: 'postSigned',
+			room: 'n8n-it-nonce-other',
+			signedText: 'unaffected',
+		});
+		expect(Number(elsewhere.items[0].nonce)).toBeGreaterThanOrEqual(before);
+		expect(Number(elsewhere.items[0].nonce)).toBeLessThan(Date.now() + 1000);
+	});
+
+	it('refuses to follow a nanosecond-scale nonce another client used in the room (nothing is posted)', async () => {
+		const room = 'n8n-it-nonce-ns';
+		const nonce = '1726221600000000000';
+		const text = 'posted by a client with a nanosecond counter';
+		const response = await fetch(`${server.origin}/r/${room}?format=json`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				did: identity.did,
+				nonce,
+				text,
+				sig: signCanonical(identity.privateKey, canonicalMessage(room, nonce, text)),
+			}),
+		});
+		expect(response.status).toBe(200);
+
+		const log: WireLog[] = [];
+		const stub = makeExecuteFunctions({
+			params: { resource: 'room', operation: 'postSigned', room, signedText: 'n8n declines' },
+			router: realRouter(log),
+			credentials,
+		});
+		const error = await node.execute.call(stub.fns).catch((e: unknown) => e);
+		expect((error as Error).message).toMatch(/ahead of the millisecond clock/);
+		expect(log.map((l) => l.status)).toEqual([400]);
+		const view = await readRoom(room);
+		expect(view.messages.map((m) => m.nonce)).toEqual([nonce]);
 	});
 
 	it('mailbox rooms accept the signed post; the unsigned post is refused locally and by the server', async () => {
@@ -334,6 +374,7 @@ describe('unsigned rooms and notes against the local server', () => {
 		expect(conflict).toBeInstanceOf(NodeApiError);
 		expect((conflict as NodeApiError).httpCode).toBe('409');
 		expect((conflict as NodeApiError).description).toContain('first value');
+		expect((conflict as NodeApiError).context.currentValue).toBe('first value');
 
 		await run({
 			resource: 'note',
@@ -357,6 +398,42 @@ describe('unsigned rooms and notes against the local server', () => {
 			untrusted: true,
 			value: 'second line',
 		});
+	});
+
+	it('a lost condition on a long note carries the whole current value (8192 characters)', async () => {
+		const long = `${'long value '.repeat(744)}end-mark`;
+		expect(long.length).toBe(8192);
+		await run({
+			resource: 'note',
+			operation: 'write',
+			namespace: 'n8n-it',
+			key: 'long',
+			value: long,
+			condition: 'ifAbsent',
+		});
+		const conflict = (await run({
+			resource: 'note',
+			operation: 'write',
+			namespace: 'n8n-it',
+			key: 'long',
+			value: 'mine',
+			condition: 'ifAbsent',
+		}).catch((e: unknown) => e)) as NodeApiError;
+		expect(conflict.httpCode).toBe('409');
+		expect(conflict.context.currentValue).toBe(long);
+		expect(conflict.description).toContain(long);
+
+		// The value is exactly what Only If Unchanged needs.
+		const rebased = await run({
+			resource: 'note',
+			operation: 'write',
+			namespace: 'n8n-it',
+			key: 'long',
+			value: 'rebased',
+			condition: 'ifMatch',
+			expected: conflict.context.currentValue as string,
+		});
+		expect(rebased.items[0]).toMatchObject({ written: true });
 	});
 
 	it('maps a server validation refusal to NodeApiError', async () => {

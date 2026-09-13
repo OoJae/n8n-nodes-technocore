@@ -260,6 +260,19 @@ export function classifyRefusal(
 	return { kind: 'server', status, message };
 }
 
+/**
+ * The note value a `409` conditional-write refusal carries: the body ends with
+ * `current value follows (N chars):\n<value>`, N counted in code points. Returns null when
+ * there is no value (an `if` against a missing note) or the body is shorter than announced.
+ */
+export function parseConflictValue(body: string): string | null {
+	const match = /(?:^|\n)current value follows \(([0-9]{1,6}) chars\):\n/.exec(body);
+	if (!match) return null;
+	const points = Array.from(body.slice(match.index + match[0].length));
+	const length = Number(match[1]);
+	return points.length >= length ? points.slice(0, length).join('') : null;
+}
+
 /** `400 ... nonce N is not greater than P, the last one this key used in /r/<room> ...` */
 export function parseStaleNonce(body: string): string | null {
 	const match =
