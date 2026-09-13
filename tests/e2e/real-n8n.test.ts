@@ -21,6 +21,7 @@ import { parseReadView } from '../../nodes/Technocore/shared/responses';
 import { TEST_SEEDS } from '../fixtures/corpus.mjs';
 import { fetchLocal, postUnsigned, startTechnocore } from '../harness/local-server.mjs';
 import { hasCheckout } from '../harness/python.mjs';
+import { readRepoFile } from '../harness/repo-files.mjs';
 import { createN8nInstance } from '../harness/real-n8n-instance.mjs';
 
 if (!hasCheckout())
@@ -213,6 +214,32 @@ describe(`real n8n`, () => {
 		expect((await readRoom('n8n-e2e-oracle')).messages).toEqual([]);
 	});
 
+	it('the shipped examples/workflows/local-smoke.json runs its unsigned + signed posts', async () => {
+		const workflow = JSON.parse(readRepoFile('examples/workflows/local-smoke.json'));
+		for (const node of workflow.nodes) {
+			for (const [type, reference] of Object.entries(node.credentials ?? {})) {
+				expect(reference).toMatchObject({ id: 'REPLACE_ME' });
+				node.credentials[type] = type === 'technocoreSigningKeyApi' ? SIGNING : API;
+			}
+		}
+		expect(workflow.nodes.map((n: { name: string }) => n.name)).toContain('Technocore Trigger');
+		workflow.id = 'tcE2eSmoke000001';
+		n8n.importJson('import:workflow', workflow);
+		const result = n8n.cli(['execute', '--id=tcE2eSmoke000001', '--rawOutput']);
+		expect(result.status, result.stderr.slice(-2000)).toBe(0);
+		const view = await readRoom('n8n-smoke');
+		expect(view.messages.map((m) => m.from)).toEqual(['n8n-smoke', identity.did]);
+		expect(view.messages[0].text).toMatch(/^unsigned smoke [0-9]+$/);
+		const signed = view.messages[1];
+		expect(
+			verifyCanonical(
+				identity.did,
+				signed.sig as string,
+				canonicalMessage('n8n-smoke', signed.nonce as string, signed.text),
+			),
+		).toBe(true);
+	});
+
 	describe('Technocore Trigger under n8n poll scheduling', () => {
 		const room = 'n8n-e2e-watch';
 		const sink = 'n8n-e2e-sink';
@@ -258,28 +285,38 @@ describe(`real n8n`, () => {
 					},
 				],
 			});
-			const published = n8n.cli(['publish:workflow', '--id=tcE2eTrigger0001']);
-			expect(published.status, published.stderr).toBe(0);
+			for (const id of ['tcE2eTrigger0001', 'tcE2eSmoke000001']) {
+				const published = n8n.cli(['publish:workflow', `--id=${id}`]);
+				expect(published.status, published.stderr).toBe(0);
+			}
 		});
 
-		function storedCursor() {
-			return n8n.exportWorkflow('tcE2eTrigger0001').staticData?.['node:Trigger']?.technocore;
+		function storedState(workflowId: string, nodeName: string) {
+			return n8n.exportWorkflow(workflowId).staticData?.[`node:${nodeName}`]?.technocore;
+		}
+		const storedCursor = () => storedState('tcE2eTrigger0001', 'Trigger');
+
+		async function waitFor(condition: () => boolean | Promise<boolean>, timeoutMs: number) {
+			const deadline = Date.now() + timeoutMs;
+			while (!(await condition()) && Date.now() < deadline) await sleep(1000);
 		}
 
-		it('activation starts from now; a 250-message burst (one signed) arrives as one backfilled batch', async () => {
+		it('activation stores the head (Start From = now) and emits nothing', async () => {
 			await postUnsigned(server.origin, room, 'before', 'posted before activation 1');
 			await postUnsigned(server.origin, room, 'before', 'posted before activation 2');
-
 			await n8n.start();
-			// Activation runs the first poll: it stores the head and emits nothing.
-			const deadline = Date.now() + 30_000;
-			while (storedCursor()?.cursor !== 2 && Date.now() < deadline) await sleep(1000);
+			await waitFor(() => storedCursor()?.cursor === 2, 60_000);
 			expect(storedCursor()).toMatchObject({ v: 1, room, cursor: 2, generation: 1 });
+			await n8n.stop();
+			expect((await readRoom(sink)).messages).toEqual([]);
+		});
+
+		it('a 250-message backlog (one signed) posted while n8n was down arrives as one backfilled batch', async () => {
 			for (let i = 1; i <= 249; i++) {
-				await postUnsigned(server.origin, room, 'writer', `burst message ${i}`);
+				await postUnsigned(server.origin, room, 'writer', `backlog message ${i}`);
 			}
 			const nonce = String(Date.now());
-			const text = 'the one signed message in the burst';
+			const text = 'the one signed message in the backlog';
 			const response = await fetchLocal(`${server.origin}/r/${room}?format=json`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -292,28 +329,56 @@ describe(`real n8n`, () => {
 			});
 			expect(response.status).toBe(200);
 
-			// A 200-message tail read cannot hold 250: the trigger must backfill from the export.
+			// Restarting reuses the stored cursor. A 200-message tail read cannot hold 250, so
+			// the first poll must backfill the oldest 50 from the export.
+			await n8n.start();
 			const view = await waitForMessages(sink, 1, 150_000);
 			expect(view.messages.map((m) => m.text)).toEqual([
 				'batch count=250 from=3 to=252 events=0 signed=1',
 			]);
-			await n8n.stop();
+			await waitFor(() => storedCursor()?.cursor === 252, 30_000);
 			expect(storedCursor()).toMatchObject({ v: 1, room, cursor: 252, generation: 1 });
 		});
 
-		it('after a restart the stored cursor is reused: only new messages, no re-delivery', async () => {
+		it('scheduled polls deliver new messages exactly once (this workflow and the shipped local-smoke example)', async () => {
+			expect(storedState('tcE2eSmoke000001', 'Technocore Trigger')).toMatchObject({
+				room: 'n8n-smoke',
+				cursor: 2,
+			});
 			for (let i = 1; i <= 3; i++) {
-				await postUnsigned(server.origin, room, 'writer', `after restart ${i}`);
+				await postUnsigned(server.origin, room, 'writer', `while running ${i}`);
 			}
-			await n8n.start();
-			const view = await waitForMessages(sink, 2, 150_000);
-			expect(view.messages.map((m) => m.text)).toEqual([
-				'batch count=250 from=3 to=252 events=0 signed=1',
-				'batch count=3 from=253 to=255 events=0 signed=0',
-			]);
+			await postUnsigned(server.origin, 'n8n-smoke', 'writer', 'for the example trigger');
+
+			// Wait for n8n's poll scheduler (every minute) to pick all of them up.
+			await waitFor(async () => {
+				const texts = (await readRoom(sink)).messages.map((m) => m.text);
+				return texts.length > 1 && storedCursor()?.cursor === 255;
+			}, 150_000);
+			await waitFor(
+				() => storedState('tcE2eSmoke000001', 'Technocore Trigger')?.cursor === 3,
+				90_000,
+			);
 			await n8n.stop();
+
+			const texts = (await readRoom(sink)).messages.map((m) => m.text);
+			expect(texts[0]).toBe('batch count=250 from=3 to=252 events=0 signed=1');
+			// Normally one batch; a scheduler tick between two of the three posts splits it. Either
+			// way the batches must be contiguous and cover 253..255 exactly once.
+			const later = texts.slice(1).map((t) => {
+				const match = /^batch count=(\d+) from=(\d+) to=(\d+) events=0 signed=0$/.exec(t);
+				expect(match, t).not.toBeNull();
+				return { count: Number(match![1]), from: Number(match![2]), to: Number(match![3]) };
+			});
+			let next = 253;
+			for (const batch of later) {
+				expect(batch.from).toBe(next);
+				expect(batch.to - batch.from + 1).toBe(batch.count);
+				next = batch.to + 1;
+			}
+			expect(next).toBe(256);
 			expect(storedCursor()).toMatchObject({ cursor: 255 });
-			expect((await readRoom(sink)).messages).toHaveLength(2);
+			expect(storedState('tcE2eSmoke000001', 'Technocore Trigger')).toMatchObject({ cursor: 3 });
 		});
 	});
 });
