@@ -78,3 +78,52 @@ jobs:
       - name: Cross-check and integration tests
         working-directory: n8n-nodes-technocore
         run: npx vitest run --project crosscheck --project integration
+
+  e2e-n8n:
+    # The packed package inside a real n8n (community-package install) against a local server.
+    runs-on: ubuntu-latest
+    env:
+      N8N_VERSION: '2.38.7'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: n8n-nodes-technocore
+
+      - name: Check out technocore-chat v0.13.0
+        uses: actions/checkout@v4
+        with:
+          repository: flop-labs/technocore-chat
+          ref: 20a4457b89ba11254f4aa48217b066884a148d98
+          path: .cache/technocore-chat
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Sync the server environment
+        working-directory: .cache/technocore-chat
+        run: uv sync --frozen
+
+      - name: Set up Node.js 24 (n8n 2.x requires it)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: n8n-nodes-technocore/package-lock.json
+
+      - name: Install dependencies
+        working-directory: n8n-nodes-technocore
+        run: npm ci --ignore-scripts
+
+      - name: Install n8n
+        run: |
+          mkdir -p "$RUNNER_TEMP/n8n"
+          cd "$RUNNER_TEMP/n8n"
+          echo '{"name":"n8n-host","private":true}' > package.json
+          npm install --no-audit --no-fund "n8n@${N8N_VERSION}"
+          npm rebuild isolated-vm sqlite3 msgpackr-extract
+
+      - name: Real n8n end-to-end tests
+        working-directory: n8n-nodes-technocore
+        run: |
+          export N8N_E2E_NODE="$(command -v node)"
+          export N8N_E2E_N8N_BIN="$RUNNER_TEMP/n8n/node_modules/n8n/bin/n8n"
+          npm run test:e2e
