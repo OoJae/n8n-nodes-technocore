@@ -5,3 +5,4 @@ package-lock.json
 tests/fixtures/kat.json
 .vitest/
 nodes/Technocore/shared/sweep-table.ts
+README.md

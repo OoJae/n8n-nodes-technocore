@@ -27,22 +27,34 @@ Tested against technocore-chat v0.13.0 (commit `20a4457`) on a local server. MIT
 
 ## Status
 
-Version 0.1.0, not published to npm. What is verified on the build machine (macOS, Node 26, n8n-workflow 2.38.1, @n8n/node-cli 0.47.2):
+Version 0.1.0, not published to npm. Verified on the build machine (macOS, Apple M5, Node 26 for the build and tests, n8n 2.38.7 on Node 24.21.0 for the end-to-end run; n8n-workflow 2.38.1, @n8n/node-cli 0.47.2, technocore-chat v0.13.0 at `20a4457`):
 
 | Check | Result |
 |---|---|
 | `npm run lint` (n8n-node lint, strict mode, n8n Cloud rule set) | passes |
 | `npm run build` | passes |
-| Unit tests: credentials, signing, parsing, node operations, `poll()` with a stubbed `IPollFunctions` for every trigger scenario, package rules, secret scan, vendor integrity | pass |
-| Cross-check against the Python signer (`uv run scripts/sign.py --seed <TEST seed> did\|say\|note`) and the server's own sweep (`store.clean_text`), including a regenerated Unicode table | pass |
-| Integration against a disposable local Technocore server through n8n's real outbound HTTP client (`@n8n/backend-network`): signed post accepted (200) and re-verified, stale-nonce retry, mailbox, notes, AI-tool refusal, trigger backfill, recreation, 429 | pass |
+| `npm run scan:local` (the two ESLint legs of `@n8n/scan-community-package`, on the committed sources and the `npm pack` tarball) | passes |
+| Unit tests (`npm run test:unit`): credentials, signing, parsing, node operations, `poll()` with a stubbed `IPollFunctions` for every trigger scenario, package rules, secret scan, vendor integrity | 118 pass |
+| Cross-check (`npm run test:crosscheck`) against the Python signer (`uv run scripts/sign.py --seed <TEST seed> did\|say\|note`) and the server's own sweep (`store.clean_text`), including a regenerated Unicode table | 9 pass |
+| Integration (`npm run test:integration`) against a disposable local server through n8n's real outbound HTTP client (`@n8n/backend-network`): signed post accepted (200) and re-verified, stale-nonce retry, mailbox, notes, both credential tests, AI-tool refusal, trigger backfill, recreation, 429 | 18 pass |
+| End to end in a real n8n (`npm run test:e2e`): the packed package installed as a community package, credentials stored encrypted by n8n, workflows run by n8n's engine and poll scheduler, local server | 8 pass |
+
+The end-to-end run checks, inside n8n 2.38.7:
+
+- n8n loads the Technocore node, the Technocore Trigger and the generated AI tool variant (`technocoreTool`).
+- Unsigned and signed posts run with credentials decrypted by n8n; the signing credential's `authenticate` signs inside n8n and the server accepts the post (200, signature verifies). The execution data contains the did, never the seed.
+- `restrictToSupportedNodes` works: an HTTP Request node given the signing credential fails with `Credential type "technocoreSigningKeyApi" is restricted to specific nodes` and nothing is posted.
+- `examples/workflows/local-smoke.json` imports and runs as shipped (credentials reselected), and its trigger picks up a later post.
+- Trigger: activation stores the head and emits nothing; a 250-message backlog posted while n8n was down arrives after restart as one batch (`count=250 from=3 to=252`, one signed), so the export backfill ran; scheduled polls deliver later messages exactly once; the cursor persists in the workflow's static data across restarts.
 
 Known gaps:
 
-- **Not loaded in a running n8n yet.** `npm run dev` (which starts a full n8n) was not run on the build machine: n8n's `isolated-vm` native module does not compile on Node 26, which is the only Node installed there. The node code is exercised through stubs and n8n's real HTTP client, not through n8n's workflow engine, credential store or UI. Before publishing, run `npm run dev` on Node 22/24 LTS, add both credentials, and run `examples/workflows/local-smoke.json` against a local server.
-- **`restrictToSupportedNodes` and function `authenticate` on n8n Cloud** are not verified (design risk 9). The package relies on n8n calling the credential's `authenticate` function for `httpRequestWithAuthentication` and for the credential test, which is how n8n core behaves at the time of writing.
-- **`npx @n8n/scan-community-package`** only works on a published package, so it has not run.
-- **Protocol vendoring.** `nodes/Technocore/shared/protocol/` is vendored from `technocore-watch-core` at commit `afb6ee4` (that package was being built at the same time). Re-run `npm run vendor` when it is released. The signing sweep deliberately does not use the vendored `sweepText` (see [Signing key credential](#signing-key-credential)).
+- **`npm run dev` cannot use the signing credential.** `n8n-node dev` links the package into n8n's *custom* folder. n8n resolves a credential's `supportedNodes` list only for community packages, so with `restrictToSupportedNodes` every node, including this one, is refused (`Credential type "technocoreSigningKeyApi" is restricted to specific nodes`). Checked in n8n 2.38.7 with the package in the custom folder: an unsigned Post succeeded, Post Signed was refused. (The API credential is not restricted, so reads and notes are unaffected.) To try signed posts locally, install the `npm pack` tarball as a community package (what `tests/harness/real-n8n-instance.mjs` does) instead of using `npm run dev`. `npm run dev` itself was not run on the build machine: it starts `npx n8n@latest` with the system Node.js, which is Node 26 there, and n8n's `isolated-vm` module does not build on Node 26.
+- **AI Agent tool path.** n8n generates and registers the tool variant (checked), but no AI Agent run was made in n8n (it needs a model). The refusal of Post Signed from the tool variant is tested through the node type n8n uses (`n8n-nodes-technocore.technocoreTool`), in unit and local-server integration tests only.
+- **n8n Cloud** is not verified: whether it honours function `authenticate` and `restrictToSupportedNodes` for community nodes (design risk 9). Self-hosted n8n 2.38.7 does.
+- **Credential test button.** Both credential test requests are run through `authenticate` and succeed against the local server in the integration tests, but the n8n UI/REST credential-test flow was not clicked through.
+- **`npx @n8n/scan-community-package`** only works on a published package, so only its lint legs have run (`npm run scan:local`).
+- **Protocol vendoring.** `nodes/Technocore/shared/protocol/` holds `names.ts`, `sweep.ts` and `types.ts` vendored from `technocore-watch-core` at commit `488d6e8` (see `VENDOR.json`; `npm run vendor:check` confirms the core's current HEAD has not changed them). `parse.ts`, `reconcile.ts` and `render.ts` are not vendored, for the reasons recorded in `VENDOR.json`. Re-run `npm run vendor` when the core package is released. The signing sweep deliberately does not use the vendored `sweepText` (see [Signing key credential](#signing-key-credential)).
 - The author email in `package.json` is required by the n8n lint rules; change it before publishing if you prefer a different address.
 
 ## Installation
@@ -159,10 +171,11 @@ npm ci
 npm run lint
 npm run build
 npm test                    # unit + crosscheck + integration
+npm run test:e2e            # real n8n, see below
 npm run test:unit           # no Python or server needed
 ```
 
-The `crosscheck` and `integration` projects need [uv](https://docs.astral.sh/uv/) and a technocore-chat checkout at `../.cache/technocore-chat` (or `TECHNOCORE_CHECKOUT=/path`). Integration tests start a disposable local server on a random port:
+The `crosscheck`, `integration` and `e2e` projects need [uv](https://docs.astral.sh/uv/) and a technocore-chat checkout at `../.cache/technocore-chat` (or `TECHNOCORE_CHECKOUT=/path`). Integration tests start a disposable local server on a random port:
 
 ```bash
 cd <technocore-chat> && CHAT_ROOT="$(mktemp -d)" CHAT_RATE_READ=1000000 CHAT_RATE_WRITE=1000000 \
@@ -171,6 +184,18 @@ cd <technocore-chat> && CHAT_ROOT="$(mktemp -d)" CHAT_RATE_READ=1000000 CHAT_RAT
 ```
 
 They never contact production for writes, and they use public test seeds only (32 bytes of `0x01` / `0x02`, and RFC 8032 test 1).
+
+The end-to-end project runs a real n8n. It is not part of `npm test` because it needs an n8n install on a Node.js release n8n supports (n8n 2.x requires Node 24):
+
+```bash
+mkdir -p /tmp/n8n-host && cd /tmp/n8n-host && echo '{"private":true}' > package.json
+PATH=/path/to/node24/bin:$PATH npm install n8n@2.38.7
+PATH=/path/to/node24/bin:$PATH npm rebuild isolated-vm sqlite3 msgpackr-extract   # npm 11 skips install scripts
+cd <this repo>
+N8N_E2E_NODE=/path/to/node24/bin/node N8N_E2E_N8N_BIN=/tmp/n8n-host/node_modules/n8n/bin/n8n npm run test:e2e
+```
+
+It builds, packs the package, installs the tarball into a temporary n8n user folder's `.n8n/nodes/node_modules` (the community-package location), imports test credentials and workflows with the n8n CLI, and starts and stops `n8n start` on free ports. Nothing is left behind.
 
 Other scripts:
 
@@ -185,7 +210,7 @@ Test tooling that needs `child_process` or `process` lives in `tests/harness/*.m
 
 ## Compatibility
 
-- n8n with `n8nNodesApiVersion` 1 and a Node.js that n8n supports (Node 20+).
+- n8n with `n8nNodesApiVersion` 1 and a Node.js that n8n supports. Tested end to end with self-hosted n8n 2.38.7 on Node 24.21.0. `restrictToSupportedNodes` needs an n8n release that supports it; older releases ignore the flag. The credential still refuses to sign anything but a Technocore room post, but on such a release other nodes (for example HTTP Request) could use it to sign room posts, so run a release that enforces it.
 - technocore-chat 0.13.0 read/write contract (`generation` in read views, `/r/<room>/export`).
 
 ## License
