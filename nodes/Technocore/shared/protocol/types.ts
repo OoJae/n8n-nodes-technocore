@@ -1,4 +1,4 @@
-// VENDORED from technocore-watch-core@488d6e85270137c9ddb312189e4801cc860acced src/protocol/types.ts - do not edit; run `npm run vendor`.
+// VENDORED from technocore-watch-core@f9c4ab6b4a6bfb683f310a7105ed865dca37b32d src/protocol/types.ts - do not edit; run `npm run vendor`.
 // Pure protocol types. No I/O, no timers — this directory is vendorable.
 
 /** One stored room record, as returned by a read view or an export line. */
@@ -60,6 +60,13 @@ export interface SubscriptionState {
   lastError?: { kind: string; at: string };
   /** Set by an offline subscribe; resolved by the engine on its first read. */
   startFrom?: 'now' | 'retained';
+  /**
+   * Set when `startFrom: 'now'` resolved on an empty read view. The view then reports
+   * last_seq 0 whatever the room's real high-water mark is (a reaped room keeps its floor, an
+   * `e-` room's expired records still count), so the first records observed settle the start
+   * position instead of everything below them being reported as lost.
+   */
+  headUnsettled?: boolean;
   createdAt?: string;
 }
 

@@ -1,20 +1,20 @@
 {
 	"source": "technocore-watch-core/src/protocol",
 	"version": "0.1.0",
-	"commit": "488d6e85270137c9ddb312189e4801cc860acced",
+	"commit": "f9c4ab6b4a6bfb683f310a7105ed865dca37b32d",
 	"transform": "one provenance comment line prepended; upstream bytes otherwise unchanged",
 	"files": {
 		"names.ts": {
 			"source": "sha256-pC3IN+5pCPR9xvov1AWZ6dqCTOs5/EwyFlrcwlSO/cI=",
-			"vendored": "sha256-J4uG7d0Bqbmaik6WXfDSrx7h83lmFKOgg0dWYGXwNSE="
+			"vendored": "sha256-p7CQ2pmFj9ptNga+7cZGswVnhMIR+W65i4C7wEe+cqI="
 		},
 		"sweep.ts": {
 			"source": "sha256-k9DpfKj7VciWMQ9W/NJvNKESBFwekToCq/gGlO+hZdg=",
-			"vendored": "sha256-i0L3Pe0gj/OSD0aD8xY5vB8/7bpucaEv3rXjnY9Ga24="
+			"vendored": "sha256-vfJOH4OeqJ+vydLpvCoZyOXBvLXJBe94vPSQbq3pvlo="
 		},
 		"types.ts": {
-			"source": "sha256-4+OZy1tJgllMAKRstw24C+URi0R1EGU7ziEkMu0roDU=",
-			"vendored": "sha256-0jA5xBre6ERZ1uacvKirqGvZqwNejc/sYc+sGM2qUbY="
+			"source": "sha256-cDrvlfKewb9QidQMcmiwlM3QWQ7AK8D48Eojyphgns4=",
+			"vendored": "sha256-mziX4IL/2xa/BHwusdIfWdqt899g48lo94SYfAxSTjw="
 		}
 	},
 	"excluded": {
