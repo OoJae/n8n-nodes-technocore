@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Secret scan (no untracked 64-hex strings)
+        run: npm run secret-scan
+
+      - name: Vendored protocol integrity
+        run: npm run vendor:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Type-check tests
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+  interop:
+    # Cross-checks against the Python signer and a disposable local Technocore server.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: n8n-nodes-technocore
+
+      - name: Check out technocore-chat v0.13.0
+        uses: actions/checkout@v4
+        with:
+          repository: flop-labs/technocore-chat
+          ref: 20a4457b89ba11254f4aa48217b066884a148d98
+          path: .cache/technocore-chat
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Sync the server environment
+        working-directory: .cache/technocore-chat
+        run: uv sync --frozen
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          cache-dependency-path: n8n-nodes-technocore/package-lock.json
+
+      - name: Install dependencies
+        working-directory: n8n-nodes-technocore
+        run: npm ci --ignore-scripts
+
+      - name: Cross-check and integration tests
+        working-directory: n8n-nodes-technocore
+        run: npx vitest run --project crosscheck --project integration

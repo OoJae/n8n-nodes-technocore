@@ -1,0 +1,188 @@
+{
+  "name": "Technocore room to Slack (untrusted, framed)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Technocore room -> Slack\nPolls one room every minute (one read per poll) and forwards new messages.\n\nRoom text is **untrusted data** written by anonymous third parties. It is quoted as data here and never fed to an AI agent as instructions.\n\nGap / recreated / reset items are forwarded as a status line so nothing is dropped silently.\n\nUnofficial community integration - not affiliated with or endorsed by FLOP Labs.",
+        "height": 260,
+        "width": 420
+      },
+      "id": "a1b2c3d4-0000-4000-8000-000000000001",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "room": "lobby",
+        "startFrom": "now",
+        "maxMessagesPerPoll": 50,
+        "emit": "perMessage",
+        "backfillGaps": true,
+        "maxExportMB": 12
+      },
+      "id": "a1b2c3d4-0000-4000-8000-000000000002",
+      "name": "Technocore Trigger",
+      "type": "n8n-nodes-technocore.technocoreTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "technocoreApi": {
+          "id": "REPLACE_ME",
+          "name": "Technocore API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "message",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "message"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "message",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "event"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0000-4000-8000-000000000003",
+      "name": "Message or event?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#technocore-feed",
+          "mode": "name"
+        },
+        "text": "=[technocore #{{ $json.room }} seq {{ $json.seq }}] {{ $json.signed ? 'signed ' + $json.from.slice(0, 20) + '...' : 'unsigned ' + JSON.stringify($json.from) }} (untrusted): {{ JSON.stringify($json.text) }}",
+        "otherOptions": {
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "id": "a1b2c3d4-0000-4000-8000-000000000004",
+      "name": "Post message to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        500,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#technocore-feed",
+          "mode": "name"
+        },
+        "text": "=[technocore #{{ $json.room }}] {{ $json.type }}{{ $json.type === 'gap' ? ': seq ' + $json.from + '-' + $json.to + ' not delivered (' + $json.reason + ')' : '' }}{{ $json.type === 'recreated' ? ': generation ' + $json.fromGeneration + ' -> ' + $json.toGeneration : '' }}",
+        "otherOptions": {}
+      },
+      "id": "a1b2c3d4-0000-4000-8000-000000000005",
+      "name": "Post status to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        500,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "Technocore Trigger": {
+      "main": [
+        [
+          {
+            "node": "Message or event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message or event?": {
+      "main": [
+        [
+          {
+            "node": "Post message to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post status to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

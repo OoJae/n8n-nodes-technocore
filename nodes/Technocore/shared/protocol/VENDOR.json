@@ -1,0 +1,36 @@
+{
+	"source": "technocore-watch-core/src/protocol",
+	"version": "0.1.0",
+	"commit": "57b4d61c6b64e6dc79e0584a9c3e0f3e0d93eec8",
+	"transform": "banner prepended (provenance line; scoped eslint-disable for files in LINT_EXCEPTIONS); upstream bytes otherwise unchanged",
+	"files": {
+		"index.ts": {
+			"source": "sha256-k4npjHMSAmwXJWSBLWh3k4poLwAHjsPXnkz6lv2dSjs=",
+			"vendored": "sha256-xN6N4eOLt7cuQjLWhPseoHfHpYqR1GyZKzZkcxwILqY="
+		},
+		"names.ts": {
+			"source": "sha256-pC3IN+5pCPR9xvov1AWZ6dqCTOs5/EwyFlrcwlSO/cI=",
+			"vendored": "sha256-o4OwzIF+avO1A3RHzvxzpNsuEgMrpFsglpEjy39yaOY="
+		},
+		"parse.ts": {
+			"source": "sha256-qZfE/saZRW54fZMFhJJdP3y29a8I0N5fSGljlgtVsMo=",
+			"vendored": "sha256-uefQ/Bjds9seM/+sNfy6suMjs3uEtypf08yYKqG6quE="
+		},
+		"reconcile.ts": {
+			"source": "sha256-wivS1vUhsUyVVdN/ZSDXYxVJizmuQWDW7nnZqFrbGgQ=",
+			"vendored": "sha256-CbymiYhn+f7941ZcliJnfjXgUX/ZXY8yNFwi5b+tZcw="
+		},
+		"render.ts": {
+			"source": "sha256-1GSdEFSj20OS+ykXNruX9nmBuPD43RWH3vrqFPkzN90=",
+			"vendored": "sha256-9UN0IR/4dM7eDQyDrjagLSLz6c3PqClYTYRfhrvF3kM="
+		},
+		"sweep.ts": {
+			"source": "sha256-k9DpfKj7VciWMQ9W/NJvNKESBFwekToCq/gGlO+hZdg=",
+			"vendored": "sha256-CNJuNsyXnmsIwRyVIuQ3YBFNXl8zwsoQJ53xwE9PyrU="
+		},
+		"types.ts": {
+			"source": "sha256-4+OZy1tJgllMAKRstw24C+URi0R1EGU7ziEkMu0roDU=",
+			"vendored": "sha256-VunbYjAVbcrHCMWnLNHaPF42q7SXmXfkKmiGgMfrxfM="
+		}
+	}
+}

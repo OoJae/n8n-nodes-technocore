@@ -1,0 +1,270 @@
+{
+	"generatedBy": "scripts/gen-fixtures.mjs",
+	"upstream": "technocore-chat v0.13.0 (20a4457) scripts/sign.py + src/store.py",
+	"seeds": {
+		"seed01": {
+			"did": "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX",
+			"notePath": "/kv/did-25/6caa6764a528a2",
+			"signatures": [
+				{
+					"room": "lobby",
+					"nonce": "1",
+					"swept": "hello from n8n",
+					"sig": "W4-V-Eeo7Ewsh-19rxbtz8-fypeyShtcYklcDFOckeKnkkC9ufWvwquSVARAvN9UajYF7w7FU8JRuaAxiCGWDA"
+				},
+				{
+					"room": "lobby",
+					"nonce": "1726221600000",
+					"swept": "millisecond nonce",
+					"sig": "GFDMUbAQrPc5lmic8-FYqMMMQOMlB8qowuhNt14YcrUlmw1tvVUL0ZGT9yWa6ZaPdkD3XTuFcvZtWYTqPuLTAw"
+				},
+				{
+					"room": "mb-p-test-mailbox",
+					"nonce": "9999999999999999999",
+					"swept": "max nonce, mailbox room",
+					"sig": "HkGDJNWi8NQ8hXsA27fKEEAdLFb6k9gPc6gLJ9wCS0NPjSrh--_WMy3qUZcDBU3hi4vORdd2jYxqw2sGac20Aw"
+				},
+				{
+					"room": "d-owned_room-1",
+					"nonce": "42",
+					"swept": "padded \u00a0text",
+					"sig": "gHsUvX6N0BLhaBy_-Ggu9JGNTj1rWuYwXdyLMpYoCgOKhrfPDJagxrczaVK9pnn-9uIk2vjn2gdRqO_SJsjBCg"
+				},
+				{
+					"room": "lobby",
+					"nonce": "7",
+					"swept": "line one line two  line three four five",
+					"sig": "Nl78WEQE3im6uvxhLf5P4EsBZ1pITzxkytm67wY9GyeRfBss-86W-NqOrRtQ7zLZMSiAMLxH3XPzz752nJYfDQ"
+				},
+				{
+					"room": "lobby",
+					"nonce": "8",
+					"swept": "bidi  evil  zero width  tag  bom",
+					"sig": "7S6LCR9zRT0-Cdp1BX0FzOZKppYdu7AuqKHDMAC7SuP62peLBvIYyPGFA1El15ma-1eliMYJvgI8Rr6KfIsMBw"
+				},
+				{
+					"room": "lobby",
+					"nonce": "9",
+					"swept": "emoji \ud83d\udc68 \ud83d\udc69 \ud83d\udc67 caf\u00e9 \u00f1 \u65e5\u672c\u8a9e \ud83d\ude00",
+					"sig": "GM_CIRQq2yQL_dAzlxnwPu1KizlVAJVnK-I8yGQ9s08MXQkSdtc4-Q2DBQ0LZ5o8QSqBVpZXBLG32w3246HaCA"
+				},
+				{
+					"room": "lobby",
+					"nonce": "10",
+					"swept": "private   soft hyphen   nel x",
+					"sig": "u1S-MoFdZMA5sHRnza4khq7RZA8OTtrcUPf9KL0M_EZiDvoMeS_O9DpR7WYRD_Y-MFFJJ32qFquesgXfP-JZCA"
+				},
+				{
+					"room": "lobby",
+					"nonce": "11",
+					"swept": "pipes | in | text | xxxxxxxxxx",
+					"sig": "8A4glkQK3dSFTbjMtQsWsro_qTSTvPaZxnOTO9xLZKOA20K7aSDaTSpXPkxXdJzus7mfXJoClq0M0OWJIWv-BQ"
+				},
+				{
+					"room": "lobby",
+					"nonce": "12",
+					"swept": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+					"sig": "WAQjxRBnXchOOcu0UUaWmqy5uczBgAd-6eSLrnvl7Zu4yy7VvR2JP8IIoYPHr79On-MhE3iv6K_BAE0EZgmPCg"
+				},
+				{
+					"room": "lobby",
+					"nonce": "13",
+					"refused": true
+				},
+				{
+					"room": "lobby",
+					"nonce": "14",
+					"swept": "\"nonce\": 123 and {\"nonce\":456} quoted",
+					"sig": "RaNtIqTU6zoKznjPzGGnoQbAXkv_JM-cwHyhPZe6b0ZeqZw-cOLDZqFMcQvu-DYWLvOcPHlt1nfGqA5w5FSCAA"
+				}
+			]
+		},
+		"seed02": {
+			"did": "did:key:z6Mko9hTggMwjSTEaJaPUfE6tqcy2xvU6BnNq3e3o8qVBiyH",
+			"notePath": "/kv/did-01/a39abc24a8ca74",
+			"signatures": [
+				{
+					"room": "lobby",
+					"nonce": "1",
+					"swept": "hello from n8n",
+					"sig": "OZAZd_7cQBlZ4M5sl3v2jaG6f6V0jBSeSFP9ig6GtV36ZofiO_1GOhdL3yLPXtVnbfp8LyaCGw5oMZEgIMPkBA"
+				},
+				{
+					"room": "lobby",
+					"nonce": "1726221600000",
+					"swept": "millisecond nonce",
+					"sig": "a6iKSRsUikzIuB1s0Tr1CBOlMDkxEYZ6wLTNI2516Kkd_i5F5BmLHx65VsyWDikdzFNxugxnv5o_1DTTSFKwAw"
+				},
+				{
+					"room": "mb-p-test-mailbox",
+					"nonce": "9999999999999999999",
+					"swept": "max nonce, mailbox room",
+					"sig": "4Cf9rhMkf2JjW4d8AuNDRlUcm3CI95Zh5B15sff_FpQAH7zMlVxjozt_0iOCZjUhjrSnYGs9Y--q0ljrvobSAA"
+				},
+				{
+					"room": "d-owned_room-1",
+					"nonce": "42",
+					"swept": "padded \u00a0text",
+					"sig": "plBUmBqA_vDMP5oF1NxF7zc5kJOq6k9vFh0NhmhAt8jp2Q-sNL5hzL9C1wwvkDNXXPKwdXsgLo6JHNQKSnrJBQ"
+				},
+				{
+					"room": "lobby",
+					"nonce": "7",
+					"swept": "line one line two  line three four five",
+					"sig": "MgH6FuPtClwYr53BPvbpwc3MGieHErEsLqWrk4Wca6Gaf-IbxcZqa2HEyvXHtxb9Zm0mzuYxWZMoNphK5tSUDA"
+				},
+				{
+					"room": "lobby",
+					"nonce": "8",
+					"swept": "bidi  evil  zero width  tag  bom",
+					"sig": "VZLpRPxa-TNWwf_mIHYQsStTgf8DcDXmTe4J7yNh2f6jYpc12IGH4V90CrSoJf1uZrfSlA5RfklmiIG4Bga5Bw"
+				},
+				{
+					"room": "lobby",
+					"nonce": "9",
+					"swept": "emoji \ud83d\udc68 \ud83d\udc69 \ud83d\udc67 caf\u00e9 \u00f1 \u65e5\u672c\u8a9e \ud83d\ude00",
+					"sig": "6PpmU4k4tH3kEuNM_QoaszodCPQB9uA0Gc_Vkdr4kFb6GCd1AEYR620XPToFgwDkZJNqEhPDQIzZ1wQYzGGABQ"
+				},
+				{
+					"room": "lobby",
+					"nonce": "10",
+					"swept": "private   soft hyphen   nel x",
+					"sig": "h2ZuJjKiViXtaDJfVVxarrC6D21lQmUk07C1YZv2M_7ZrE43Djrq-eK4aIOx5rluRazCfbxugw5v6cMdAJwgDw"
+				},
+				{
+					"room": "lobby",
+					"nonce": "11",
+					"swept": "pipes | in | text | xxxxxxxxxx",
+					"sig": "cYWOi3tVVDHPiIEPBZ0ZOi4NDnJ9fn0goR3lBNmORrYpLsa2DtyaD2Gy918HLG4vUQ-C4peDtwVLkn0wEzhoBw"
+				},
+				{
+					"room": "lobby",
+					"nonce": "12",
+					"swept": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+					"sig": "2H5QN50L1ovrQNSTZ8O0hHA8L0q5eRMEFl3KOlKsgZpuEycfOOMFxyzzl5KcWNdzjf43NYBr9MkU2vlceXimCw"
+				},
+				{
+					"room": "lobby",
+					"nonce": "13",
+					"refused": true
+				},
+				{
+					"room": "lobby",
+					"nonce": "14",
+					"swept": "\"nonce\": 123 and {\"nonce\":456} quoted",
+					"sig": "2QP2PyjS5eV10CN6sPKRDzTFS-dURbKewBt9iRG0uolVNmGyMYTFzaJTpqNIqO7GM6MpqYOPdN6Hk1GDxIidDQ"
+				}
+			]
+		}
+	},
+	"sweep": [
+		{
+			"index": 0,
+			"swept": null
+		},
+		{
+			"index": 1,
+			"swept": null
+		},
+		{
+			"index": 2,
+			"swept": "plain"
+		},
+		{
+			"index": 3,
+			"swept": "trim me"
+		},
+		{
+			"index": 4,
+			"swept": "nbsp"
+		},
+		{
+			"index": 5,
+			"swept": "wide"
+		},
+		{
+			"index": 6,
+			"swept": "ogham"
+		},
+		{
+			"index": 7,
+			"swept": "tab new line cr vt ff"
+		},
+		{
+			"index": 8,
+			"swept": null
+		},
+		{
+			"index": 9,
+			"swept": null
+		},
+		{
+			"index": 10,
+			"swept": "x y z"
+		},
+		{
+			"index": 11,
+			"swept": null
+		},
+		{
+			"index": 12,
+			"swept": null
+		},
+		{
+			"index": 13,
+			"swept": null
+		},
+		{
+			"index": 14,
+			"swept": null
+		},
+		{
+			"index": 15,
+			"swept": null
+		},
+		{
+			"index": 16,
+			"swept": null
+		},
+		{
+			"index": 17,
+			"swept": null
+		},
+		{
+			"index": 18,
+			"swept": "\ud83d\udc68 \ud83d\udc69 \ud83d\udc67"
+		},
+		{
+			"index": 19,
+			"swept": "\u2065"
+		},
+		{
+			"index": 20,
+			"swept": "\ud80d\udc55"
+		},
+		{
+			"index": 21,
+			"swept": null
+		},
+		{
+			"index": 22,
+			"swept": "e\u0301 combining"
+		},
+		{
+			"index": 23,
+			"swept": "\u00e9 precomposed"
+		},
+		{
+			"index": 24,
+			"swept": null
+		},
+		{
+			"index": 25,
+			"swept": "null"
+		},
+		{
+			"index": 26,
+			"swept": null
+		}
+	]
+}

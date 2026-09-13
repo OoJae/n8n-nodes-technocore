@@ -1,0 +1,3 @@
+#!/bin/sh
+# Refuse commits containing 64+ character hex strings that are not allow-listed test vectors.
+exec node "$(git rev-parse --show-toplevel)/scripts/secret-scan.mjs" --staged

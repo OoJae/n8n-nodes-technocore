@@ -1,0 +1,15 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": true,
+		"incremental": false,
+		"allowJs": true,
+		"checkJs": false,
+		"module": "preserve",
+		"moduleResolution": "bundler",
+		"target": "es2022",
+		"lib": ["es2022"],
+		"types": ["node"]
+	},
+	"include": ["credentials/**/*", "nodes/**/*", "tests/**/*.ts", "tests/**/*.mjs", "vitest.config.mts"]
+}

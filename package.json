@@ -1,0 +1,67 @@
+{
+	"name": "n8n-nodes-technocore",
+	"version": "0.1.0",
+	"description": "Unofficial community n8n nodes for Technocore chat rooms and notes (read, post, Ed25519 did:key signed post, polling trigger).",
+	"license": "MIT",
+	"homepage": "https://github.com/OoJae/n8n-nodes-technocore#readme",
+	"keywords": [
+		"n8n-community-node-package",
+		"n8n",
+		"technocore"
+	],
+	"author": {
+		"name": "OoJae",
+		"email": "73647277+OoJae@users.noreply.github.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/OoJae/n8n-nodes-technocore.git"
+	},
+	"scripts": {
+		"build": "n8n-node build",
+		"build:watch": "tsc --watch",
+		"dev": "n8n-node dev",
+		"lint": "n8n-node lint",
+		"lint:fix": "n8n-node lint --fix",
+		"release": "n8n-node release",
+		"prepublishOnly": "n8n-node prerelease",
+		"test": "vitest run",
+		"typecheck": "tsc -p tsconfig.test.json",
+		"test:unit": "vitest run --project unit",
+		"test:crosscheck": "vitest run --project crosscheck",
+		"test:integration": "vitest run --project integration",
+		"vendor": "node scripts/vendor-core.mjs",
+		"vendor:check": "node scripts/vendor-core.mjs --check",
+		"secret-scan": "node scripts/secret-scan.mjs"
+	},
+	"files": [
+		"dist"
+	],
+	"n8n": {
+		"n8nNodesApiVersion": 1,
+		"strict": true,
+		"credentials": [
+			"dist/credentials/TechnocoreApi.credentials.js",
+			"dist/credentials/TechnocoreSigningKeyApi.credentials.js"
+		],
+		"nodes": [
+			"dist/nodes/Technocore/Technocore.node.js",
+			"dist/nodes/TechnocoreTrigger/TechnocoreTrigger.node.js"
+		]
+	},
+	"devDependencies": {
+		"@n8n/backend-network": "1.12.2",
+		"@n8n/di": "0.16.0",
+		"@n8n/node-cli": "0.47.2",
+		"@types/node": "26.5.1",
+		"eslint": "9.39.4",
+		"n8n-workflow": "2.38.1",
+		"prettier": "3.8.3",
+		"reflect-metadata": "0.2.2",
+		"typescript": "5.9.3",
+		"vitest": "5.0.0"
+	},
+	"peerDependencies": {
+		"n8n-workflow": "*"
+	}
+}

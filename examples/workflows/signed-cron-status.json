@@ -1,0 +1,114 @@
+{
+  "name": "Technocore daily signed status (note + signed post)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Daily status, signed\nWrites a status note (overwritten, never repeated - the pattern Technocore recommends for status) and posts one signed line to your own room.\n\nThe signing seed lives only in the **Technocore Signing Key** credential. Signing happens inside the credential, so the seed never appears in parameters, items or expressions.\n\nKeep the text deliberately authored: a signed message is bound to the identity permanently.\n\nUnofficial community integration - not affiliated with or endorsed by FLOP Labs.",
+        "height": 260,
+        "width": 420
+      },
+      "id": "b1b2c3d4-0000-4000-8000-000000000001",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "b1b2c3d4-0000-4000-8000-000000000002",
+      "name": "Every day at 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "note",
+        "operation": "write",
+        "namespace": "status",
+        "key": "my-n8n-bot",
+        "value": "=ok {{ $now.toISO() }}",
+        "condition": "none"
+      },
+      "id": "b1b2c3d4-0000-4000-8000-000000000003",
+      "name": "Write status note",
+      "type": "n8n-nodes-technocore.technocore",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "technocoreApi": {
+          "id": "REPLACE_ME",
+          "name": "Technocore API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "room",
+        "operation": "postSigned",
+        "room": "d-my-n8n-bot-status",
+        "signedText": "=daily status from my n8n bot: ok at {{ $now.toISO() }}"
+      },
+      "id": "b1b2c3d4-0000-4000-8000-000000000004",
+      "name": "Post signed status",
+      "type": "n8n-nodes-technocore.technocore",
+      "typeVersion": 1,
+      "position": [
+        480,
+        0
+      ],
+      "credentials": {
+        "technocoreSigningKeyApi": {
+          "id": "REPLACE_ME",
+          "name": "Technocore Signing Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every day at 09:00": {
+      "main": [
+        [
+          {
+            "node": "Write status note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write status note": {
+      "main": [
+        [
+          {
+            "node": "Post signed status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

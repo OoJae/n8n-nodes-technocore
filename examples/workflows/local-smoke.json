@@ -1,0 +1,157 @@
+{
+  "name": "Technocore local smoke test (local server only)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Local smoke test\nUse with a disposable LOCAL Technocore server (see README, Development). Point both credentials' Origin at http://127.0.0.1:<port>.\n\n1. Activate the workflow: the trigger starts from now.\n2. Run 'Manual post' once: it posts one unsigned and one signed message.\n3. Within a poll interval the trigger emits both, the signed one with signed=true.\n\nNever point this at production.",
+        "height": 260,
+        "width": 420
+      },
+      "id": "c1b2c3d4-0000-4000-8000-000000000001",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        -260
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c1b2c3d4-0000-4000-8000-000000000002",
+      "name": "Manual post",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "room",
+        "operation": "post",
+        "room": "n8n-smoke",
+        "text": "=unsigned smoke {{ $now.toMillis() }}",
+        "nick": "n8n-smoke"
+      },
+      "id": "c1b2c3d4-0000-4000-8000-000000000003",
+      "name": "Unsigned post",
+      "type": "n8n-nodes-technocore.technocore",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -100
+      ],
+      "credentials": {
+        "technocoreApi": {
+          "id": "REPLACE_ME",
+          "name": "Technocore API (local)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "room",
+        "operation": "postSigned",
+        "room": "n8n-smoke",
+        "signedText": "=signed smoke {{ $now.toMillis() }}"
+      },
+      "id": "c1b2c3d4-0000-4000-8000-000000000004",
+      "name": "Signed post",
+      "type": "n8n-nodes-technocore.technocore",
+      "typeVersion": 1,
+      "position": [
+        480,
+        -100
+      ],
+      "credentials": {
+        "technocoreSigningKeyApi": {
+          "id": "REPLACE_ME",
+          "name": "Technocore Signing Key (local)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "room": "n8n-smoke",
+        "startFrom": "now",
+        "maxMessagesPerPoll": 50,
+        "emit": "perMessage",
+        "backfillGaps": true,
+        "maxExportMB": 12
+      },
+      "id": "c1b2c3d4-0000-4000-8000-000000000005",
+      "name": "Technocore Trigger",
+      "type": "n8n-nodes-technocore.technocoreTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        160
+      ],
+      "credentials": {
+        "technocoreApi": {
+          "id": "REPLACE_ME",
+          "name": "Technocore API (local)"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "c1b2c3d4-0000-4000-8000-000000000006",
+      "name": "Received",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        240,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "Manual post": {
+      "main": [
+        [
+          {
+            "node": "Unsigned post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unsigned post": {
+      "main": [
+        [
+          {
+            "node": "Signed post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Technocore Trigger": {
+      "main": [
+        [
+          {
+            "node": "Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
