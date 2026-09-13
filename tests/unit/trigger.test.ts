@@ -255,6 +255,27 @@ describe('TechnocoreTrigger.poll()', () => {
 		expect(seqsOf(items)).toEqual(range(1, 350));
 	});
 
+	it('a recreation first seen while the new generation shows no messages is still classified when they appear', async () => {
+		const h = harness();
+		await h.poll();
+		h.room.postMany(30);
+		await h.poll();
+		expect(cursorOf(h)).toBe(30);
+		h.room.reapLosingFloor();
+		h.room.post('tester', 'first of generation two'); // seq 1, generation 2
+		h.room.expireAll();
+		const first = await h.poll();
+		expect(first.items?.map((item) => item.type)).toEqual(['recreated']);
+		expect(h.staticData.technocore).toMatchObject({ cursor: 0, generation: 2, recreatedFrom: 30 });
+
+		h.room.postMany(3); // seq 2..4, all at or below the old cursor
+		const second = await h.poll();
+		expect(second.items?.map((item) => item.type)).toEqual(['reset', 'gap', 'message', 'message', 'message']);
+		expect(second.items?.[1]).toMatchObject({ type: 'gap', from: 1, to: 1, reason: 'ring-dropped', generation: 2 });
+		expect(seqsOf(second.items)).toEqual([2, 3, 4]);
+		expect(h.staticData.technocore).toEqual({ v: 1, origin: ORIGIN, room: 'lobby', cursor: 4, generation: 2 });
+	});
+
 	it('429 on the read throws NodeApiError with the retry hint and leaves the cursor unchanged', async () => {
 		const h = harness();
 		await h.poll();

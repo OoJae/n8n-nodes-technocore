@@ -35,6 +35,12 @@ export interface TriggerState {
 	room: string;
 	cursor: number;
 	generation?: number;
+	/**
+	 * Set when a recreation was reported but the new generation had no visible messages:
+	 * the cursor before the recreation, so the next poll still classifies the new
+	 * generation's first messages (recreated gap or sequence reset).
+	 */
+	recreatedFrom?: number;
 }
 
 export type TriggerEvent =
@@ -61,6 +67,9 @@ export function readState(data: unknown, origin: string, room: string): TriggerS
 	const out: TriggerState = { v: STATE_VERSION, origin, room, cursor: state.cursor };
 	if (typeof state.generation === 'number' && Number.isSafeInteger(state.generation)) {
 		out.generation = state.generation;
+	}
+	if (typeof state.recreatedFrom === 'number' && Number.isSafeInteger(state.recreatedFrom) && state.recreatedFrom >= 0) {
+		out.recreatedFrom = state.recreatedFrom;
 	}
 	return out;
 }
@@ -123,7 +132,12 @@ export function assemble(input: AssembleInput): AssembleResult {
 			if (first && leading.mode === 'suppress') {
 				// History from before the trigger started: not a gap.
 			} else if (first && leading.mode === 'recreated') {
-				if (to > leading.previousCursor) {
+				if (seq <= leading.previousCursor) {
+					// The sequence restarted: seqs below the first visible one belong to the new
+					// generation and were dropped before this trigger saw them.
+					events.push({ type: 'reset', previousCursor: leading.previousCursor, firstSeq: seq });
+					events.push({ type: 'gap', gap: { from, to, reason: 'ring-dropped' } });
+				} else if (to > leading.previousCursor) {
 					events.push({
 						type: 'gap',
 						gap: { from: Math.max(from, leading.previousCursor + 1), to, reason: 'recreated' },
@@ -133,7 +147,7 @@ export function assemble(input: AssembleInput): AssembleResult {
 				events.push({ type: 'gap', gap: { from, to, reason: holeReason(from, first, input) } });
 			}
 		}
-		if (first && leading.mode === 'recreated' && seq <= leading.previousCursor) {
+		if (first && leading.mode === 'recreated' && seq <= leading.previousCursor && seq === next + 1) {
 			events.push({ type: 'reset', previousCursor: leading.previousCursor, firstSeq: seq });
 		}
 		first = false;

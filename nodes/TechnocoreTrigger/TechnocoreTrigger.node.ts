@@ -291,20 +291,25 @@ export class TechnocoreTrigger implements INodeType {
 
 		const events: TriggerEvent[] = [];
 		let base = state.cursor;
+		if (state.recreatedFrom !== undefined) {
+			// A recreation was reported earlier but the new generation showed no messages yet.
+			leading = { mode: 'recreated', previousCursor: state.recreatedFrom };
+		}
 		let view = await readView(this, `/r/${room}?since=${state.cursor}&limit=${TAIL_LIMIT}&format=json`);
 		const recreated = isRecreation(state.generation, view.generation);
 		if (recreated) {
+			const previousCursor = state.recreatedFrom ?? state.cursor;
 			events.push({
 				type: 'recreated',
 				fromGeneration: state.generation as number,
 				toGeneration: view.generation as number,
-				previousCursor: state.cursor,
+				previousCursor,
 			});
 			// The new generation may have restarted its sequence, which a since= read cannot
 			// show, so read it from the start.
-			view = await readView(this, `/r/${room}?limit=${TAIL_LIMIT}&format=json`);
+			if (state.cursor !== 0) view = await readView(this, `/r/${room}?limit=${TAIL_LIMIT}&format=json`);
 			base = 0;
-			leading = { mode: 'recreated', previousCursor: state.cursor };
+			leading = { mode: 'recreated', previousCursor };
 		}
 
 		let scan: ExportScan | undefined;
@@ -332,12 +337,13 @@ export class TechnocoreTrigger implements INodeType {
 		});
 		events.push(...result.events);
 
-		const nextState: TriggerState = {
-			v: STATE_VERSION,
-			origin,
-			room,
-			cursor: recreated && result.emittedMessages === 0 ? state.cursor : result.cursor,
-		};
+		const nextState: TriggerState = { v: STATE_VERSION, origin, room, cursor: result.cursor };
+		if (leading.mode === 'recreated' && result.emittedMessages === 0) {
+			// Nothing from the new generation is visible yet: read it from its start next time
+			// and keep treating what comes first as the continuation of the recreation.
+			nextState.cursor = 0;
+			nextState.recreatedFrom = leading.previousCursor;
+		}
 		const generation = view.generation ?? state.generation;
 		if (generation !== undefined) nextState.generation = generation;
 		staticData[STATE_KEY] = nextState as unknown as IDataObject;

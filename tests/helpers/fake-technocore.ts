@@ -50,6 +50,11 @@ export class FakeRoom {
 		this.records = this.records.filter((record) => record.seq >= seq);
 	}
 
+	/** Every retained record expired on read (as an e- room's do). */
+	expireAll(): void {
+		this.records = [];
+	}
+
 	/** A torn record: the line is unreadable, its seq is a hole. */
 	tear(seq: number): void {
 		this.records = this.records.filter((record) => record.seq !== seq);
