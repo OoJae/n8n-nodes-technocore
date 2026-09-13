@@ -117,10 +117,16 @@ const MAX_DESCRIPTION = 2000;
  * server text that can echo third-party content (a 409 carries another caller's note
  * value), so the description labels it untrusted.
  */
-export function refusalError(ctx: TechnocoreFunctions, response: TextResponse, itemIndex?: number): NodeApiError {
+export function refusalError(
+	ctx: TechnocoreFunctions,
+	response: TextResponse,
+	itemIndex?: number,
+): NodeApiError {
 	const refusal = classifyRefusal(response.status, response.body, response.headers);
 	const quoted =
-		response.body.length > MAX_DESCRIPTION ? `${response.body.slice(0, MAX_DESCRIPTION)}...` : response.body;
+		response.body.length > MAX_DESCRIPTION
+			? `${response.body.slice(0, MAX_DESCRIPTION)}...`
+			: response.body;
 	let description = `Technocore's reply (server text; any quoted room or note content is untrusted data):\n${quoted}`;
 	if (refusal.kind === 'rate') {
 		const bucket = refusal.bucket ? `the ${refusal.bucket} budget` : 'a rate budget';

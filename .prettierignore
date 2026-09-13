@@ -1,0 +1,7 @@
+nodes/Technocore/shared/protocol/
+dist/
+node_modules/
+package-lock.json
+tests/fixtures/kat.json
+.vitest/
+nodes/Technocore/shared/sweep-table.ts

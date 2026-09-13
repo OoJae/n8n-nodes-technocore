@@ -2,13 +2,21 @@ import { NodeApiError, type IDataObject, type IHttpRequestOptions } from 'n8n-wo
 import { describe, expect, it } from 'vitest';
 
 import { TechnocoreTrigger } from '../../nodes/TechnocoreTrigger/TechnocoreTrigger.node';
-import { FakeRoom, RATE_LIMITED_BODY, routeRoom, type FakeResponse } from '../helpers/fake-technocore';
+import {
+	FakeRoom,
+	RATE_LIMITED_BODY,
+	routeRoom,
+	type FakeResponse,
+} from '../helpers/fake-technocore';
 import { makePollFunctions, type Router } from '../helpers/n8n-stubs';
 
 const trigger = new TechnocoreTrigger();
 const ORIGIN = 'https://technocore.test';
 
-function roomRouter(room: FakeRoom, override?: (request: IHttpRequestOptions) => FakeResponse | undefined): Router {
+function roomRouter(
+	room: FakeRoom,
+	override?: (request: IHttpRequestOptions) => FakeResponse | undefined,
+): Router {
 	return (request) => override?.(request) ?? routeRoom(room, request.url, request.method ?? 'GET');
 }
 
@@ -16,7 +24,11 @@ interface Harness {
 	room: FakeRoom;
 	staticData: IDataObject;
 	params: IDataObject;
-	poll: (options?: { mode?: 'trigger' | 'manual'; router?: Router; pollBudgetMs?: number }) => Promise<{
+	poll: (options?: {
+		mode?: 'trigger' | 'manual';
+		router?: Router;
+		pollBudgetMs?: number;
+	}) => Promise<{
 		items: IDataObject[] | null;
 		urls: string[];
 	}>;
@@ -24,7 +36,15 @@ interface Harness {
 
 function harness(params: IDataObject = {}, room = new FakeRoom('lobby')): Harness {
 	const staticData: IDataObject = {};
-	const allParams: IDataObject = { room: room.name, startFrom: 'now', maxMessagesPerPoll: 50, emit: 'perMessage', backfillGaps: true, maxExportMB: 12, ...params };
+	const allParams: IDataObject = {
+		room: room.name,
+		startFrom: 'now',
+		maxMessagesPerPoll: 50,
+		emit: 'perMessage',
+		backfillGaps: true,
+		maxExportMB: 12,
+		...params,
+	};
 	return {
 		room,
 		staticData,
@@ -77,7 +97,13 @@ describe('TechnocoreTrigger.poll()', () => {
 		const { items, urls } = await h.poll();
 		expect(items).toBeNull();
 		expect(urls).toEqual([`${ORIGIN}/r/lobby?limit=1&format=json`]);
-		expect(h.staticData.technocore).toEqual({ v: 1, origin: ORIGIN, room: 'lobby', cursor: 5, generation: 1 });
+		expect(h.staticData.technocore).toEqual({
+			v: 1,
+			origin: ORIGIN,
+			room: 'lobby',
+			cursor: 5,
+			generation: 1,
+		});
 
 		const second = await h.poll();
 		expect(second.items).toBeNull();
@@ -113,7 +139,11 @@ describe('TechnocoreTrigger.poll()', () => {
 		const h = harness();
 		await h.poll();
 		for (let i = 0; i < 8; i++) {
-			h.room.post(i % 2 ? 'alice' : 'did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp', `burst ${i}`, i % 2 ? {} : { nonce: '1234567890123456789', sig: `${'A'.repeat(85)}A` });
+			h.room.post(
+				i % 2 ? 'alice' : 'did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp',
+				`burst ${i}`,
+				i % 2 ? {} : { nonce: '1234567890123456789', sig: `${'A'.repeat(85)}A` },
+			);
 		}
 		const { items } = await h.poll();
 		expect(seqsOf(items)).toEqual(range(1, 8));
@@ -150,7 +180,10 @@ describe('TechnocoreTrigger.poll()', () => {
 		await h.poll();
 		h.room.postMany(450);
 		const { items, urls } = await h.poll();
-		expect(urls).toEqual([`${ORIGIN}/r/lobby?since=0&limit=200&format=json`, `${ORIGIN}/r/lobby/export`]);
+		expect(urls).toEqual([
+			`${ORIGIN}/r/lobby?since=0&limit=200&format=json`,
+			`${ORIGIN}/r/lobby/export`,
+		]);
 		expect(seqsOf(items)).toEqual(range(1, 450));
 		expect(items?.some((item) => item.type === 'gap')).toBe(false);
 		expect(cursorOf(h)).toBe(450);
@@ -171,7 +204,15 @@ describe('TechnocoreTrigger.poll()', () => {
 		h.room.postMany(400);
 		h.room.dropBefore(151);
 		const { items } = await h.poll();
-		expect(items?.[0]).toEqual({ type: 'gap', room: 'lobby', generation: 1, from: 1, to: 150, count: 150, reason: 'ring-dropped' });
+		expect(items?.[0]).toEqual({
+			type: 'gap',
+			room: 'lobby',
+			generation: 1,
+			from: 1,
+			to: 150,
+			count: 150,
+			reason: 'ring-dropped',
+		});
 		expect(seqsOf(items)).toEqual(range(151, 400));
 		expect(cursorOf(h)).toBe(400);
 	});
@@ -209,7 +250,11 @@ describe('TechnocoreTrigger.poll()', () => {
 		h.room.postMany(5);
 		h.room.tear(3);
 		const { items } = await h.poll();
-		expect(items?.map((item) => (item.type === 'gap' ? `gap:${item.from}-${item.to}:${item.reason}` : item.seq))).toEqual([1, 2, 'gap:3-3:missing', 4, 5]);
+		expect(
+			items?.map((item) =>
+				item.type === 'gap' ? `gap:${item.from}-${item.to}:${item.reason}` : item.seq,
+			),
+		).toEqual([1, 2, 'gap:3-3:missing', 4, 5]);
 	});
 
 	it('a recreated room that kept its seq floor emits recreated + a recreated gap, then the new messages', async () => {
@@ -221,8 +266,20 @@ describe('TechnocoreTrigger.poll()', () => {
 		h.room.reapKeepingFloor();
 		h.room.postMany(3); // 16..18 in generation 2
 		const { items } = await h.poll();
-		expect(items?.[0]).toEqual({ type: 'recreated', room: 'lobby', fromGeneration: 1, toGeneration: 2, previousCursor: 10 });
-		expect(items?.[1]).toMatchObject({ type: 'gap', from: 11, to: 15, reason: 'recreated', generation: 2 });
+		expect(items?.[0]).toEqual({
+			type: 'recreated',
+			room: 'lobby',
+			fromGeneration: 1,
+			toGeneration: 2,
+			previousCursor: 10,
+		});
+		expect(items?.[1]).toMatchObject({
+			type: 'gap',
+			from: 11,
+			to: 15,
+			reason: 'recreated',
+			generation: 2,
+		});
 		expect(seqsOf(items)).toEqual([16, 17, 18]);
 		expect(h.staticData.technocore).toMatchObject({ cursor: 18, generation: 2 });
 		expect((await h.poll()).items).toBeNull();
@@ -237,8 +294,20 @@ describe('TechnocoreTrigger.poll()', () => {
 		h.room.reapLosingFloor();
 		h.room.postMany(4); // seq 1..4 again, generation 2
 		const { items } = await h.poll();
-		expect(items?.map((item) => item.type)).toEqual(['recreated', 'reset', 'message', 'message', 'message', 'message']);
-		expect(items?.[1]).toMatchObject({ type: 'reset', previousCursor: 20, firstSeq: 1, generation: 2 });
+		expect(items?.map((item) => item.type)).toEqual([
+			'recreated',
+			'reset',
+			'message',
+			'message',
+			'message',
+			'message',
+		]);
+		expect(items?.[1]).toMatchObject({
+			type: 'reset',
+			previousCursor: 20,
+			firstSeq: 1,
+			generation: 2,
+		});
 		expect(seqsOf(items)).toEqual([1, 2, 3, 4]);
 		expect(h.staticData.technocore).toMatchObject({ cursor: 4, generation: 2 });
 	});
@@ -270,10 +339,28 @@ describe('TechnocoreTrigger.poll()', () => {
 
 		h.room.postMany(3); // seq 2..4, all at or below the old cursor
 		const second = await h.poll();
-		expect(second.items?.map((item) => item.type)).toEqual(['reset', 'gap', 'message', 'message', 'message']);
-		expect(second.items?.[1]).toMatchObject({ type: 'gap', from: 1, to: 1, reason: 'ring-dropped', generation: 2 });
+		expect(second.items?.map((item) => item.type)).toEqual([
+			'reset',
+			'gap',
+			'message',
+			'message',
+			'message',
+		]);
+		expect(second.items?.[1]).toMatchObject({
+			type: 'gap',
+			from: 1,
+			to: 1,
+			reason: 'ring-dropped',
+			generation: 2,
+		});
 		expect(seqsOf(second.items)).toEqual([2, 3, 4]);
-		expect(h.staticData.technocore).toEqual({ v: 1, origin: ORIGIN, room: 'lobby', cursor: 4, generation: 2 });
+		expect(h.staticData.technocore).toEqual({
+			v: 1,
+			origin: ORIGIN,
+			room: 'lobby',
+			cursor: 4,
+			generation: 2,
+		});
 	});
 
 	it('429 on the read throws NodeApiError with the retry hint and leaves the cursor unchanged', async () => {
@@ -281,7 +368,11 @@ describe('TechnocoreTrigger.poll()', () => {
 		await h.poll();
 		h.room.postMany(3);
 		const before = structuredClone(h.staticData);
-		const limited: Router = () => ({ status: 429, body: RATE_LIMITED_BODY, headers: { 'retry-after': '7' } });
+		const limited: Router = () => ({
+			status: 429,
+			body: RATE_LIMITED_BODY,
+			headers: { 'retry-after': '7' },
+		});
 		const error = await h.poll({ router: limited }).catch((e: unknown) => e);
 		expect(error).toBeInstanceOf(NodeApiError);
 		expect((error as NodeApiError).httpCode).toBe('429');
@@ -297,7 +388,9 @@ describe('TechnocoreTrigger.poll()', () => {
 		h.room.postMany(300);
 		const before = structuredClone(h.staticData);
 		const router = roomRouter(h.room, (request) =>
-			(request.url as string).endsWith('/export') ? { status: 429, body: RATE_LIMITED_BODY, headers: { 'retry-after': '3' } } : undefined,
+			(request.url as string).endsWith('/export')
+				? { status: 429, body: RATE_LIMITED_BODY, headers: { 'retry-after': '3' } }
+				: undefined,
 		);
 		await expect(h.poll({ router })).rejects.toBeInstanceOf(NodeApiError);
 		expect(h.staticData).toEqual(before);
@@ -309,7 +402,9 @@ describe('TechnocoreTrigger.poll()', () => {
 		await h.poll();
 		h.room.postMany(2);
 		const before = structuredClone(h.staticData);
-		await expect(h.poll({ router: () => ({ status: 503, body: 'upstream down\n' }) })).rejects.toBeInstanceOf(NodeApiError);
+		await expect(
+			h.poll({ router: () => ({ status: 503, body: 'upstream down\n' }) }),
+		).rejects.toBeInstanceOf(NodeApiError);
 		expect(h.staticData).toEqual(before);
 	});
 
@@ -343,8 +438,21 @@ describe('TechnocoreTrigger.poll()', () => {
 		const { items } = await h.poll();
 		expect(items).toHaveLength(1);
 		const batch = items?.[0] as IDataObject;
-		expect(batch).toMatchObject({ type: 'batch', untrusted: true, room: 'lobby', count: 200, fromSeq: 6, toSeq: 205, generation: 1 });
-		expect((batch.events as IDataObject[])[0]).toMatchObject({ type: 'gap', from: 1, to: 5, reason: 'not-backfilled' });
+		expect(batch).toMatchObject({
+			type: 'batch',
+			untrusted: true,
+			room: 'lobby',
+			count: 200,
+			fromSeq: 6,
+			toSeq: 205,
+			generation: 1,
+		});
+		expect((batch.events as IDataObject[])[0]).toMatchObject({
+			type: 'gap',
+			from: 1,
+			to: 5,
+			reason: 'not-backfilled',
+		});
 	});
 
 	it('changing the room (or origin) starts over instead of reusing a foreign cursor', async () => {
@@ -364,7 +472,10 @@ describe('TechnocoreTrigger.poll()', () => {
 	it('parses 19-digit nonces without precision loss', async () => {
 		const h = harness();
 		await h.poll();
-		h.room.post('did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp', 'big nonce', { nonce: '9223372036854775807', sig: `${'b'.repeat(85)}Q` });
+		h.room.post('did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp', 'big nonce', {
+			nonce: '9223372036854775807',
+			sig: `${'b'.repeat(85)}Q`,
+		});
 		const { items } = await h.poll();
 		expect(items?.[0].nonce).toBe('9223372036854775807');
 	});

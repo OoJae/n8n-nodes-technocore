@@ -24,8 +24,14 @@ export function loadAllowList(root = ROOT) {
 	const raw = JSON.parse(readFileSync(path.join(root, ALLOW_FILE), 'utf8'));
 	const allowed = new Map();
 	for (const entry of raw.allow ?? []) {
-		if (typeof entry.value !== 'string' || typeof entry.label !== 'string' || !/test/i.test(entry.label)) {
-			throw new Error(`${ALLOW_FILE}: every entry needs a value and a label that says it is a test vector`);
+		if (
+			typeof entry.value !== 'string' ||
+			typeof entry.label !== 'string' ||
+			!/test/i.test(entry.label)
+		) {
+			throw new Error(
+				`${ALLOW_FILE}: every entry needs a value and a label that says it is a test vector`,
+			);
 		}
 		allowed.set(entry.value.toLowerCase(), entry.label);
 	}
@@ -38,7 +44,11 @@ export function findHexSecrets(text, allowed) {
 	lines.forEach((line, index) => {
 		for (const match of line.matchAll(HEX_RUN)) {
 			if (!allowed.has(match[0].toLowerCase())) {
-				findings.push({ line: index + 1, prefix: `${match[0].slice(0, 6)}...`, length: match[0].length });
+				findings.push({
+					line: index + 1,
+					prefix: `${match[0].slice(0, 6)}...`,
+					length: match[0].length,
+				});
 			}
 		}
 	});
@@ -52,7 +62,10 @@ function isProbablyBinary(buffer) {
 export function scan({ staged = false, root = ROOT } = {}) {
 	const allowed = loadAllowList(root);
 	const files = staged
-		? git(['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']).toString('utf8').split('\0').filter(Boolean)
+		? git(['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'])
+				.toString('utf8')
+				.split('\0')
+				.filter(Boolean)
 		: git(['ls-files', '-z']).toString('utf8').split('\0').filter(Boolean);
 	const problems = [];
 	for (const file of files) {
@@ -73,9 +86,14 @@ export function scan({ staged = false, root = ROOT } = {}) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	const { files, problems } = scan({ staged: process.argv.includes('--staged') });
 	if (problems.length) {
-		console.error('secret-scan: refusing hex strings of 64+ characters that are not allow-listed test vectors:');
-		for (const p of problems) console.error(`  ${p.file}:${p.line}  ${p.prefix} (${p.length} hex chars)`);
-		console.error(`If one is a public TEST vector, add it to ${ALLOW_FILE} with a label containing "test".`);
+		console.error(
+			'secret-scan: refusing hex strings of 64+ characters that are not allow-listed test vectors:',
+		);
+		for (const p of problems)
+			console.error(`  ${p.file}:${p.line}  ${p.prefix} (${p.length} hex chars)`);
+		console.error(
+			`If one is a public TEST vector, add it to ${ALLOW_FILE} with a label containing "test".`,
+		);
 		process.exit(1);
 	}
 	console.log(`secret-scan: ${files} file(s) clean`);

@@ -12,8 +12,17 @@ import {
 	parseRoomReply,
 	parseStaleNonce,
 } from '../../nodes/Technocore/shared/responses';
-import { codePointLength, isInvisible, isPythonSpace, sweep } from '../../nodes/Technocore/shared/sweep';
-import { INVISIBLE_RANGES, SPACE_RANGES, UNICODE_VERSION } from '../../nodes/Technocore/shared/sweep-table';
+import {
+	codePointLength,
+	isInvisible,
+	isPythonSpace,
+	sweep,
+} from '../../nodes/Technocore/shared/sweep';
+import {
+	INVISIBLE_RANGES,
+	SPACE_RANGES,
+	UNICODE_VERSION,
+} from '../../nodes/Technocore/shared/sweep-table';
 import { SWEEP_CORPUS, cp } from '../fixtures/corpus.mjs';
 import kat from '../fixtures/kat.json';
 
@@ -75,8 +84,18 @@ describe('names', () => {
 		expect(isValidName('-x')).toBe(false);
 		expect(isValidName('lobby\n')).toBe(false);
 		expect(isValidName('a b')).toBe(false);
-		expect(roomClasses('mb-p-x')).toEqual({ private: true, mailbox: true, ownable: false, ephemeral: false });
-		expect(roomClasses('pastel')).toEqual({ private: false, mailbox: false, ownable: false, ephemeral: false });
+		expect(roomClasses('mb-p-x')).toEqual({
+			private: true,
+			mailbox: true,
+			ownable: false,
+			ephemeral: false,
+		});
+		expect(roomClasses('pastel')).toEqual({
+			private: false,
+			mailbox: false,
+			ownable: false,
+			ephemeral: false,
+		});
 		expect(isMailbox('mb-p-x')).toBe(true);
 		expect(roomClasses('mb-p-x').private).toBe(true);
 		expect(roomClasses('d-room').ownable).toBe(true);
@@ -139,7 +158,9 @@ describe('refusals', () => {
 			message: '429 rate limited: the read budget for your IP (600/min) is spent.',
 		});
 		expect(parseRefusal(429, body)).toMatchObject({ retryAfterS: 4 });
-		expect(parseRefusal(429, '429 room-creation budget spent: ...')).toMatchObject({ bucket: 'rooms' });
+		expect(parseRefusal(429, '429 room-creation budget spent: ...')).toMatchObject({
+			bucket: 'rooms',
+		});
 	});
 
 	it('classifies the other statuses', () => {
@@ -151,7 +172,9 @@ describe('refusals', () => {
 
 	it('extracts the stale nonce and the expected canonical string', () => {
 		expect(
-			parseStaleNonce('400 nonce 5 is not greater than 1726221600123, the last one this key used in /r/lobby - count up'),
+			parseStaleNonce(
+				'400 nonce 5 is not greater than 1726221600123, the last one this key used in /r/lobby - count up',
+			),
 		).toBe('1726221600123');
 		expect(parseStaleNonce('400 bad name')).toBeNull();
 		expect(

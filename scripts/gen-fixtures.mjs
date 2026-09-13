@@ -6,10 +6,21 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { KAT_ITEMS, TEST_SEEDS, SWEEP_CORPUS, asciiJson, fromCodePoints, toCodePoints } from '../tests/fixtures/corpus.mjs';
+import {
+	KAT_ITEMS,
+	TEST_SEEDS,
+	SWEEP_CORPUS,
+	asciiJson,
+	fromCodePoints,
+	toCodePoints,
+} from '../tests/fixtures/corpus.mjs';
 import { PACKAGE_ROOT, pythonBatch, signPy } from '../tests/harness/python.mjs';
 
-const fixture = { generatedBy: 'scripts/gen-fixtures.mjs', upstream: 'technocore-chat v0.13.0 (20a4457) scripts/sign.py + src/store.py', seeds: {} };
+const fixture = {
+	generatedBy: 'scripts/gen-fixtures.mjs',
+	upstream: 'technocore-chat v0.13.0 (20a4457) scripts/sign.py + src/store.py',
+	seeds: {},
+};
 
 for (const [label, seedHex] of Object.entries(TEST_SEEDS)) {
 	const [did] = signPy(seedHex, ['did']);
@@ -26,7 +37,12 @@ for (const [label, seedHex] of Object.entries(TEST_SEEDS)) {
 		signatures: batch.results.map((result, index) =>
 			result === null
 				? { room: KAT_ITEMS[index].room, nonce: KAT_ITEMS[index].nonce, refused: true }
-				: { room: KAT_ITEMS[index].room, nonce: KAT_ITEMS[index].nonce, swept: fromCodePoints(result.swept), sig: result.sig },
+				: {
+						room: KAT_ITEMS[index].room,
+						nonce: KAT_ITEMS[index].nonce,
+						swept: fromCodePoints(result.swept),
+						sig: result.sig,
+					},
 		),
 	};
 }

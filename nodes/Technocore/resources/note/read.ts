@@ -31,10 +31,18 @@ export const noteReadDescription: INodeProperties[] = [
 ];
 
 export async function noteRead(this: IExecuteFunctions, itemIndex: number): Promise<IDataObject[]> {
-	const ns = validName(this, this.getNodeParameter('namespace', itemIndex, ''), 'namespace', itemIndex);
+	const ns = validName(
+		this,
+		this.getNodeParameter('namespace', itemIndex, ''),
+		'namespace',
+		itemIndex,
+	);
 	const key = validName(this, this.getNodeParameter('key', itemIndex, ''), 'key', itemIndex);
 	const notFound = this.getNodeParameter('notFound', itemIndex, 'returnEmpty') as string;
-	const response = await requestText(this, API_CREDENTIAL, { method: 'GET', path: `/kv/${ns}/${key}` });
+	const response = await requestText(this, API_CREDENTIAL, {
+		method: 'GET',
+		path: `/kv/${ns}/${key}`,
+	});
 	if (response.status === 404 && notFound === 'returnEmpty') {
 		return [{ namespace: ns, key, found: false }];
 	}

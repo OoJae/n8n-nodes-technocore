@@ -11,5 +11,11 @@
 		"lib": ["es2022"],
 		"types": ["node"]
 	},
-	"include": ["credentials/**/*", "nodes/**/*", "tests/**/*.ts", "tests/**/*.mjs", "vitest.config.mts"]
+	"include": [
+		"credentials/**/*",
+		"nodes/**/*",
+		"tests/**/*.ts",
+		"tests/**/*.mjs",
+		"vitest.config.mts"
+	]
 }

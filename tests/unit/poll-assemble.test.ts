@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ExportScan } from '../../nodes/Technocore/shared/export';
-import { assemble, isRecreation, needsBackfill, readState, type AssembleInput, type TriggerEvent } from '../../nodes/Technocore/shared/poll';
+import {
+	assemble,
+	isRecreation,
+	needsBackfill,
+	readState,
+	type AssembleInput,
+	type TriggerEvent,
+} from '../../nodes/Technocore/shared/poll';
 import type { Message, ReadView } from '../../nodes/Technocore/shared/protocol/types';
 
 const msg = (seq: number): Message => ({ seq, ts: 't', from: 'a', text: `m${seq}` });
@@ -16,7 +23,13 @@ const view = (seqs: number[], generation = 1): ReadView => ({
 const run = (input: Partial<AssembleInput> & { cursor: number; view: ReadView }) =>
 	assemble({ backfillDisabled: false, leading: { mode: 'report' }, maxMessages: 1000, ...input });
 const describeEvents = (events: TriggerEvent[]) =>
-	events.map((e) => (e.type === 'message' ? e.message.seq : e.type === 'gap' ? `gap:${e.gap.from}-${e.gap.to}:${e.gap.reason}` : e.type));
+	events.map((e) =>
+		e.type === 'message'
+			? e.message.seq
+			: e.type === 'gap'
+				? `gap:${e.gap.from}-${e.gap.to}:${e.gap.reason}`
+				: e.type,
+	);
 
 /** Every seq in (cursor, newCursor] is emitted as a message or inside exactly one gap. */
 function expectInvariant(cursor: number, events: TriggerEvent[], newCursor: number) {
@@ -34,12 +47,21 @@ function expectInvariant(cursor: number, events: TriggerEvent[], newCursor: numb
 
 describe('assemble()', () => {
 	it('recreated with the sequence continuing right after the old cursor reports no gap', () => {
-		const result = run({ cursor: 0, view: view([11, 12]), leading: { mode: 'recreated', previousCursor: 10 }, scan: { records: [], bounded: false, bytes: 0, oldestSeq: 11 } });
+		const result = run({
+			cursor: 0,
+			view: view([11, 12]),
+			leading: { mode: 'recreated', previousCursor: 10 },
+			scan: { records: [], bounded: false, bytes: 0, oldestSeq: 11 },
+		});
 		expect(describeEvents(result.events)).toEqual([11, 12]);
 	});
 
 	it('recreated with a restarted sequence: reset, then a gap for dropped new-generation seqs', () => {
-		const result = run({ cursor: 0, view: view([3, 4]), leading: { mode: 'recreated', previousCursor: 10 } });
+		const result = run({
+			cursor: 0,
+			view: view([3, 4]),
+			leading: { mode: 'recreated', previousCursor: 10 },
+		});
 		expect(describeEvents(result.events)).toEqual(['reset', 'gap:1-2:ring-dropped', 3, 4]);
 	});
 
@@ -63,9 +85,21 @@ describe('assemble()', () => {
 				const bounded = random() > 0.8;
 				const cut = bounded ? Math.floor(random() * all.length) : all.length;
 				const seen = all.slice(0, cut).filter((s) => s < (v.first_seq ?? Infinity));
-				scan = { records: seen.filter((s) => s > cursor).map(msg), bounded, bytes: 0, oldestSeq: all[0], lastSeenSeq: seen.length ? seen[seen.length - 1] : undefined };
+				scan = {
+					records: seen.filter((s) => s > cursor).map(msg),
+					bounded,
+					bytes: 0,
+					oldestSeq: all[0],
+					lastSeenSeq: seen.length ? seen[seen.length - 1] : undefined,
+				};
 			}
-			const result = run({ cursor, view: v, scan, backfillDisabled: needsBackfill(cursor, v) && !backfill, maxMessages: 1 + Math.floor(random() * 300) });
+			const result = run({
+				cursor,
+				view: v,
+				scan,
+				backfillDisabled: needsBackfill(cursor, v) && !backfill,
+				maxMessages: 1 + Math.floor(random() * 300),
+			});
 			expectInvariant(cursor, result.events, result.cursor);
 			expect(result.cursor).toBeGreaterThanOrEqual(cursor);
 		}
@@ -74,7 +108,9 @@ describe('assemble()', () => {
 
 describe('state helpers', () => {
 	it('reads only matching, well-formed state', () => {
-		expect(readState({ v: 1, origin: 'o', room: 'r', cursor: 5, generation: 2 }, 'o', 'r')).toEqual({ v: 1, origin: 'o', room: 'r', cursor: 5, generation: 2 });
+		expect(readState({ v: 1, origin: 'o', room: 'r', cursor: 5, generation: 2 }, 'o', 'r')).toEqual(
+			{ v: 1, origin: 'o', room: 'r', cursor: 5, generation: 2 },
+		);
 		expect(readState({ v: 1, origin: 'o', room: 'x', cursor: 5 }, 'o', 'r')).toBeNull();
 		expect(readState({ v: 2, origin: 'o', room: 'r', cursor: 5 }, 'o', 'r')).toBeNull();
 		expect(readState({ v: 1, origin: 'o', room: 'r', cursor: -1 }, 'o', 'r')).toBeNull();

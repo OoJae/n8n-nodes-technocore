@@ -43,7 +43,10 @@ describe('example workflows', () => {
 			const workflow = JSON.parse(text);
 			expect(Array.isArray(workflow.nodes), name).toBe(true);
 			expect(typeof workflow.connections, name).toBe('object');
-			expect(workflow.nodes.some((n: { type: string }) => n.type.startsWith('n8n-nodes-technocore.')), name).toBe(true);
+			expect(
+				workflow.nodes.some((n: { type: string }) => n.type.startsWith('n8n-nodes-technocore.')),
+				name,
+			).toBe(true);
 			expect(text, name).not.toMatch(/privateKeySeed|[0-9a-f]{64}/i);
 		}
 	});

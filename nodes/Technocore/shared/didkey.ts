@@ -8,7 +8,14 @@
  * Only node:crypto is used (an import n8n Cloud allows). Error messages never contain key
  * material.
  */
-import { createHash, createPrivateKey, createPublicKey, sign, verify, type KeyObject } from 'node:crypto';
+import {
+	createHash,
+	createPrivateKey,
+	createPublicKey,
+	sign,
+	verify,
+	type KeyObject,
+} from 'node:crypto';
 
 import { DID_RE } from './names';
 
@@ -87,7 +94,8 @@ export function identityFromSeed(seed: Buffer): Identity {
 	const spki = createPublicKey(privateKey).export({ format: 'der', type: 'spki' });
 	const publicKey = Buffer.from(spki.subarray(SPKI_ED25519_PREFIX.length));
 	const did = `did:key:z${base58btc(Buffer.concat([MULTICODEC_ED25519, publicKey]))}`;
-	if (!DID_RE.test(did)) throw new SigningKeyError('Internal error: derived did:key has an unexpected shape.');
+	if (!DID_RE.test(did))
+		throw new SigningKeyError('Internal error: derived did:key has an unexpected shape.');
 	return { did, privateKey, publicKey };
 }
 

@@ -7,7 +7,11 @@ import type {
 	INodeProperties,
 } from 'n8n-workflow';
 
-import { DEFAULT_ORIGIN, normalizeOrigin, resolveOnOrigin } from '../nodes/Technocore/shared/origin';
+import {
+	DEFAULT_ORIGIN,
+	normalizeOrigin,
+	resolveOnOrigin,
+} from '../nodes/Technocore/shared/origin';
 
 /**
  * Connection settings for reading and unsigned posting. Technocore has no accounts, so this

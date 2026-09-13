@@ -51,11 +51,18 @@ export const roomReadDescription: INodeProperties[] = [
 
 export async function roomRead(this: IExecuteFunctions, itemIndex: number): Promise<IDataObject[]> {
 	const room = requireRoom(this, itemIndex);
-	const limit = Math.max(1, Math.min(200, Math.floor(this.getNodeParameter('limit', itemIndex, 50) as number)));
+	const limit = Math.max(
+		1,
+		Math.min(200, Math.floor(this.getNodeParameter('limit', itemIndex, 50) as number)),
+	);
 	const since = Math.max(0, Math.floor(this.getNodeParameter('since', itemIndex, 0) as number));
 	const output = this.getNodeParameter('output', itemIndex, 'perMessage') as string;
-	const query = since > 0 ? `since=${since}&limit=${limit}&format=json` : `limit=${limit}&format=json`;
-	const response = await requestText(this, API_CREDENTIAL, { method: 'GET', path: `/r/${room}?${query}` });
+	const query =
+		since > 0 ? `since=${since}&limit=${limit}&format=json` : `limit=${limit}&format=json`;
+	const response = await requestText(this, API_CREDENTIAL, {
+		method: 'GET',
+		path: `/r/${room}?${query}`,
+	});
 	if (!isSuccess(response.status)) throw refusalError(this, response, itemIndex);
 	let view;
 	try {

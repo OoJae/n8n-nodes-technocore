@@ -79,7 +79,9 @@ async function exportScan(
 	}
 	const generationHeader = headerValue(response.headers, 'x-room-generation');
 	const generation =
-		generationHeader !== undefined && /^[0-9]+$/.test(generationHeader) ? Number(generationHeader) : undefined;
+		generationHeader !== undefined && /^[0-9]+$/.test(generationHeader)
+			? Number(generationHeader)
+			: undefined;
 	const scan = await scanExport(response.body, { afterSeq, beforeSeq, maxBytes, deadline });
 	return { scan, generation };
 }
@@ -148,7 +150,10 @@ export class TechnocoreTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Technocore Trigger',
 		name: 'technocoreTrigger',
-		icon: { light: 'file:../../icons/technocore.svg', dark: 'file:../../icons/technocore.dark.svg' },
+		icon: {
+			light: 'file:../../icons/technocore.svg',
+			dark: 'file:../../icons/technocore.dark.svg',
+		},
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{"room: " + $parameter["room"]}}',
@@ -208,7 +213,8 @@ export class TechnocoreTrigger implements INodeType {
 				type: 'number',
 				typeOptions: { minValue: 1, maxValue: 1000 },
 				default: 50,
-				description: 'Messages beyond this wait for the next poll; the cursor only moves past what was emitted',
+				description:
+					'Messages beyond this wait for the next poll; the cursor only moves past what was emitted',
 			},
 			{
 				displayName: 'Emit',
@@ -241,7 +247,8 @@ export class TechnocoreTrigger implements INodeType {
 				typeOptions: { minValue: 1, maxValue: 16 },
 				default: 12,
 				displayOptions: { show: { backfillGaps: [true] } },
-				description: 'Stop reading the export after this many megabytes; anything not reached is emitted as a gap',
+				description:
+					'Stop reading the export after this many megabytes; anything not reached is emitted as a gap',
 			},
 		],
 	};
@@ -250,10 +257,14 @@ export class TechnocoreTrigger implements INodeType {
 		const startedAt = Date.now();
 		const room = validName(this, this.getNodeParameter('room', ''), 'room name');
 		const startFrom = this.getNodeParameter('startFrom', 'now') as string;
-		const maxMessages = Math.max(1, Math.min(1000, Math.floor(this.getNodeParameter('maxMessagesPerPoll', 50) as number)));
+		const maxMessages = Math.max(
+			1,
+			Math.min(1000, Math.floor(this.getNodeParameter('maxMessagesPerPoll', 50) as number)),
+		);
 		const emit = this.getNodeParameter('emit', 'perMessage') as string;
 		const backfill = this.getNodeParameter('backfillGaps', true) as boolean;
-		const maxBytes = Math.max(1, Math.min(16, Number(this.getNodeParameter('maxExportMB', 12)))) * 1024 * 1024;
+		const maxBytes =
+			Math.max(1, Math.min(16, Number(this.getNodeParameter('maxExportMB', 12)))) * 1024 * 1024;
 
 		const credentials = await this.getCredentials(API_CREDENTIAL);
 		let origin: string;
@@ -265,7 +276,10 @@ export class TechnocoreTrigger implements INodeType {
 
 		if (this.getMode() === 'manual') {
 			// A manual test shows the newest messages and never touches the cursor.
-			const view = await readView(this, `/r/${room}?limit=${Math.min(TAIL_LIMIT, maxMessages)}&format=json`);
+			const view = await readView(
+				this,
+				`/r/${room}?limit=${Math.min(TAIL_LIMIT, maxMessages)}&format=json`,
+			);
 			if (!view.messages.length) return null;
 			const events: TriggerEvent[] = view.messages.map((message) => ({ type: 'message', message }));
 			return [toItems(events, view.room, view.generation, emit)];
@@ -295,7 +309,10 @@ export class TechnocoreTrigger implements INodeType {
 			// A recreation was reported earlier but the new generation showed no messages yet.
 			leading = { mode: 'recreated', previousCursor: state.recreatedFrom };
 		}
-		let view = await readView(this, `/r/${room}?since=${state.cursor}&limit=${TAIL_LIMIT}&format=json`);
+		let view = await readView(
+			this,
+			`/r/${room}?since=${state.cursor}&limit=${TAIL_LIMIT}&format=json`,
+		);
 		const recreated = isRecreation(state.generation, view.generation);
 		if (recreated) {
 			const previousCursor = state.recreatedFrom ?? state.cursor;
@@ -307,7 +324,8 @@ export class TechnocoreTrigger implements INodeType {
 			});
 			// The new generation may have restarted its sequence, which a since= read cannot
 			// show, so read it from the start.
-			if (state.cursor !== 0) view = await readView(this, `/r/${room}?limit=${TAIL_LIMIT}&format=json`);
+			if (state.cursor !== 0)
+				view = await readView(this, `/r/${room}?limit=${TAIL_LIMIT}&format=json`);
 			base = 0;
 			leading = { mode: 'recreated', previousCursor };
 		}
@@ -315,7 +333,14 @@ export class TechnocoreTrigger implements INodeType {
 		let scan: ExportScan | undefined;
 		const backfillNeeded = needsBackfill(base, view);
 		if (backfillNeeded && backfill) {
-			const exported = await exportScan(this, room, base, view.first_seq as number, maxBytes, startedAt);
+			const exported = await exportScan(
+				this,
+				room,
+				base,
+				view.first_seq as number,
+				maxBytes,
+				startedAt,
+			);
 			if (
 				exported.generation !== undefined &&
 				view.generation !== undefined &&

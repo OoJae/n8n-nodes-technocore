@@ -1,4 +1,9 @@
-import { NodeOperationError, type IDataObject, type IExecuteFunctions, type INodeProperties } from 'n8n-workflow';
+import {
+	NodeOperationError,
+	type IDataObject,
+	type IExecuteFunctions,
+	type INodeProperties,
+} from 'n8n-workflow';
 
 import { messageItem } from '../../shared/items';
 import { isMailbox } from '../../shared/names';
@@ -40,7 +45,10 @@ export async function roomPost(this: IExecuteFunctions, itemIndex: number): Prom
 		throw new NodeOperationError(
 			this.getNode(),
 			`/r/${room} is a mailbox (mb-) room and accepts signed writes only`,
-			{ itemIndex, description: 'Use the "Post Signed" operation with a Technocore Signing Key credential.' },
+			{
+				itemIndex,
+				description: 'Use the "Post Signed" operation with a Technocore Signing Key credential.',
+			},
 		);
 	}
 	const text = this.getNodeParameter('text', itemIndex, '') as string;
@@ -65,6 +73,7 @@ export async function roomPost(this: IExecuteFunctions, itemIndex: number): Prom
 	} catch (error) {
 		throw protocolError(this, error, itemIndex);
 	}
-	if (!reply.posted) throw protocolError(this, new Error('Technocore did not return the posted record'), itemIndex);
+	if (!reply.posted)
+		throw protocolError(this, new Error('Technocore did not return the posted record'), itemIndex);
 	return [{ ...messageItem(reply.view.room, reply.view.generation, reply.posted), type: 'posted' }];
 }

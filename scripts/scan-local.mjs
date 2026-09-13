@@ -11,7 +11,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SOURCE_FILE_PATTERNS, analyzePackage } from '@n8n/scan-community-package/scanner/scanner.mjs';
+import {
+	SOURCE_FILE_PATTERNS,
+	analyzePackage,
+} from '@n8n/scan-community-package/scanner/scanner.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -19,7 +22,10 @@ export async function scanLocal() {
 	const work = mkdtempSync(path.join(os.tmpdir(), 'n8n-scan-'));
 	try {
 		const source = path.join(work, 'source');
-		const archive = execFileSync('git', ['archive', '--format=tar', `--prefix=source/`, 'HEAD'], { cwd: ROOT, maxBuffer: 256 * 1024 * 1024 });
+		const archive = execFileSync('git', ['archive', '--format=tar', `--prefix=source/`, 'HEAD'], {
+			cwd: ROOT,
+			maxBuffer: 256 * 1024 * 1024,
+		});
 		execFileSync('tar', ['-x', '-C', work], { input: archive });
 		const packDir = path.join(work, 'pack');
 		execFileSync('npm', ['pack', '--pack-destination', work], { cwd: ROOT, stdio: 'pipe' });
@@ -36,7 +42,10 @@ export async function scanLocal() {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	const { sourceResult, distResult, passed } = await scanLocal();
-	for (const [leg, result] of [['source', sourceResult], ['dist', distResult]]) {
+	for (const [leg, result] of [
+		['source', sourceResult],
+		['dist', distResult],
+	]) {
 		console.log(`${leg}: ${result.passed ? 'passed' : `FAILED (${result.message})`}`);
 		if (result.details) console.log(result.details);
 	}

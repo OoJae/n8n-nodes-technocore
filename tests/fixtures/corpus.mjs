@@ -11,7 +11,9 @@ export const TEST_SEEDS = {
 
 /** String from code points; lone surrogates allowed (fromCharCode for 0xd800-0xdfff). */
 export const cp = (...points) =>
-	points.map((p) => (p >= 0xd800 && p <= 0xdfff ? String.fromCharCode(p) : String.fromCodePoint(p))).join('');
+	points
+		.map((p) => (p >= 0xd800 && p <= 0xdfff ? String.fromCharCode(p) : String.fromCodePoint(p)))
+		.join('');
 
 const ZWJ = cp(0x200d);
 const RLO = cp(0x202e);
@@ -39,9 +41,21 @@ export const KAT_ITEMS = [
 	{ room: 'lobby', nonce: '1726221600000', text: 'millisecond nonce' },
 	{ room: 'mb-p-test-mailbox', nonce: '9999999999999999999', text: 'max nonce, mailbox room' },
 	{ room: 'd-owned_room-1', nonce: '42', text: `  padded ${NBSP}text${IDEOGRAPHIC_SPACE} ` },
-	{ room: 'lobby', nonce: '7', text: `line one${NL}line two${CR}${NL}line three${LS}four${PS}five` },
-	{ room: 'lobby', nonce: '8', text: `bidi ${RLO}evil${ZWJ} zero${ZWSP}width ${TAG_A}tag ${BOM}bom` },
-	{ room: 'lobby', nonce: '9', text: `emoji ${FAMILY} caf${cp(0xe9)} ${cp(0xf1)} ${cp(0x65e5, 0x672c, 0x8a9e)} ${cp(0x1f600)}` },
+	{
+		room: 'lobby',
+		nonce: '7',
+		text: `line one${NL}line two${CR}${NL}line three${LS}four${PS}five`,
+	},
+	{
+		room: 'lobby',
+		nonce: '8',
+		text: `bidi ${RLO}evil${ZWJ} zero${ZWSP}width ${TAG_A}tag ${BOM}bom`,
+	},
+	{
+		room: 'lobby',
+		nonce: '9',
+		text: `emoji ${FAMILY} caf${cp(0xe9)} ${cp(0xf1)} ${cp(0x65e5, 0x672c, 0x8a9e)} ${cp(0x1f600)}`,
+	},
 	{
 		room: 'lobby',
 		nonce: '10',
@@ -107,5 +121,8 @@ export function fromCodePoints(codePoints) {
 
 /** JSON with every non-ASCII UTF-16 unit escaped, so fixture files stay ASCII-only. */
 export function asciiJson(value) {
-	return JSON.stringify(value, null, TAB).replace(/[^\x20-\x7e\n\t]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`);
+	return JSON.stringify(value, null, TAB).replace(
+		/[^\x20-\x7e\n\t]/g,
+		(ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`,
+	);
 }

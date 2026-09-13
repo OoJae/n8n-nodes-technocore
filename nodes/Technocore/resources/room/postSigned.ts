@@ -1,4 +1,9 @@
-import { NodeOperationError, type IDataObject, type IExecuteFunctions, type INodeProperties } from 'n8n-workflow';
+import {
+	NodeOperationError,
+	type IDataObject,
+	type IExecuteFunctions,
+	type INodeProperties,
+} from 'n8n-workflow';
 
 import { messageItem } from '../../shared/items';
 import { parseRoomReply, parseStaleNonce } from '../../shared/responses';
@@ -33,7 +38,10 @@ export const roomPostSignedDescription: INodeProperties[] = [
 	},
 ];
 
-export async function roomPostSigned(this: IExecuteFunctions, itemIndex: number): Promise<IDataObject[]> {
+export async function roomPostSigned(
+	this: IExecuteFunctions,
+	itemIndex: number,
+): Promise<IDataObject[]> {
 	const room = requireRoom(this, itemIndex);
 	const text = this.getNodeParameter('signedText', itemIndex, '') as string;
 	if (typeof text !== 'string' || text.trim() === '') {
@@ -67,6 +75,7 @@ export async function roomPostSigned(this: IExecuteFunctions, itemIndex: number)
 	} catch (error) {
 		throw protocolError(this, error, itemIndex);
 	}
-	if (!reply.posted) throw protocolError(this, new Error('Technocore did not return the posted record'), itemIndex);
+	if (!reply.posted)
+		throw protocolError(this, new Error('Technocore did not return the posted record'), itemIndex);
 	return [{ ...messageItem(reply.view.room, reply.view.generation, reply.posted), type: 'posted' }];
 }

@@ -27,7 +27,8 @@ export const noteDescription: INodeProperties[] = [
 				name: 'Write',
 				value: 'write',
 				action: 'Write a note',
-				description: 'Write a value under a namespace and key, optionally only if absent or unchanged',
+				description:
+					'Write a value under a namespace and key, optionally only if absent or unchanged',
 			},
 		],
 		default: 'read',

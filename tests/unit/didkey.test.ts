@@ -56,10 +56,15 @@ describe('Ed25519 known answers', () => {
 					}
 					const withSig = vector as { swept: string; sig: string };
 					expect(swept).toBe(withSig.swept);
-					const sig = signCanonical(identity.privateKey, canonicalMessage(item.room, item.nonce, swept));
+					const sig = signCanonical(
+						identity.privateKey,
+						canonicalMessage(item.room, item.nonce, swept),
+					);
 					expect(sig).toBe(withSig.sig);
 					expect(sig).toMatch(/^[A-Za-z0-9_-]{85}[AQgw]$/);
-					expect(verifyCanonical(identity.did, sig, `${item.room}|${item.nonce}|${swept}`)).toBe(true);
+					expect(verifyCanonical(identity.did, sig, `${item.room}|${item.nonce}|${swept}`)).toBe(
+						true,
+					);
 				});
 			});
 		});
@@ -90,7 +95,8 @@ describe('seed parsing', () => {
 			message = (error as Error).message;
 		}
 		expect(message).toMatch(/64 hexadecimal characters/);
-		if (typeof value === 'string' && value.length > 8) expect(message).not.toContain(value.trim().slice(0, 16));
+		if (typeof value === 'string' && value.length > 8)
+			expect(message).not.toContain(value.trim().slice(0, 16));
 	});
 });
 

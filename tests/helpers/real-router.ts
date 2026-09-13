@@ -18,7 +18,12 @@ export interface WireLog {
 export function realRouter(log: WireLog[] = []): Router {
 	return async (request: IHttpRequestOptions): Promise<FakeResponse> => {
 		const response = (await outboundHttp().request(request)) as IN8nHttpFullResponse;
-		log.push({ method: request.method ?? 'GET', url: request.url, status: response.statusCode, body: request.body });
+		log.push({
+			method: request.method ?? 'GET',
+			url: request.url,
+			status: response.statusCode,
+			body: request.body,
+		});
 		return {
 			status: response.statusCode,
 			body: response.body as string,

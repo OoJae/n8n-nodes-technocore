@@ -14,4 +14,3 @@ const { OutboundHttp } = require('@n8n/backend-network');
 export function outboundHttp() {
 	return Container.get(OutboundHttp).requests();
 }
-

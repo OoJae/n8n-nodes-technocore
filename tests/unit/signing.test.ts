@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { TechnocoreApi } from '../../credentials/TechnocoreApi.credentials';
 import { TechnocoreSigningKeyApi } from '../../credentials/TechnocoreSigningKeyApi.credentials';
-import { identityFromSeed, parseSeedHex, verifyCanonical } from '../../nodes/Technocore/shared/didkey';
+import {
+	identityFromSeed,
+	parseSeedHex,
+	verifyCanonical,
+} from '../../nodes/Technocore/shared/didkey';
 import {
 	authenticateSigningRequest,
 	nextNonce,
@@ -17,7 +21,12 @@ const identity = identityFromSeed(parseSeedHex(TEST_SEEDS.seed01));
 const NOW = 1726221600000;
 
 function post(body: unknown, extra: Partial<IHttpRequestOptions> = {}): IHttpRequestOptions {
-	return { method: 'POST', url: '/r/lobby?format=json', body: body as IHttpRequestOptions['body'], ...extra };
+	return {
+		method: 'POST',
+		url: '/r/lobby?format=json',
+		body: body as IHttpRequestOptions['body'],
+		...extra,
+	};
 }
 
 async function refusal(promise: Promise<unknown>): Promise<string> {
@@ -64,30 +73,60 @@ describe('TechnocoreSigningKeyApi credential', () => {
 	});
 
 	it('passes the credential test request through untouched (after validating the key)', async () => {
-		const sent = await credential.authenticate({ ...creds }, { method: 'GET', baseURL: `${ORIGIN}/`, url: '/.well-known/agent.json' });
+		const sent = await credential.authenticate(
+			{ ...creds },
+			{ method: 'GET', baseURL: `${ORIGIN}/`, url: '/.well-known/agent.json' },
+		);
 		expect(sent.url).toBe(`${ORIGIN}/.well-known/agent.json`);
 		expect(sent.body).toBeUndefined();
 		const bad = await refusal(
-			credential.authenticate({ ...creds, privateKeySeed: 'nope' }, { method: 'GET', baseURL: ORIGIN, url: '/.well-known/agent.json' }),
+			credential.authenticate(
+				{ ...creds, privateKeySeed: 'nope' },
+				{ method: 'GET', baseURL: ORIGIN, url: '/.well-known/agent.json' },
+			),
 		);
 		expect(bad).toMatch(/64 hexadecimal characters/);
 	});
 
 	it.each<[string, IHttpRequestOptions]>([
 		['a GET to another path', { method: 'GET', url: '/r/lobby?format=json' }],
-		['a POST to a note', post({ text: 'x', context: 'workflow' }, { url: '/kv/ns/key?format=json' })],
+		[
+			'a POST to a note',
+			post({ text: 'x', context: 'workflow' }, { url: '/kv/ns/key?format=json' }),
+		],
 		['a POST without format=json', post({ text: 'x', context: 'workflow' }, { url: '/r/lobby' })],
-		['extra query parameters', post({ text: 'x', context: 'workflow' }, { url: '/r/lobby?format=json&x=1' })],
+		[
+			'extra query parameters',
+			post({ text: 'x', context: 'workflow' }, { url: '/r/lobby?format=json&x=1' }),
+		],
 		['qs options', post({ text: 'x', context: 'workflow' }, { qs: { a: 1 } })],
 		['a fragment', post({ text: 'x', context: 'workflow' }, { url: '/r/lobby?format=json#frag' })],
-		['another origin', post({ text: 'x', context: 'workflow' }, { url: 'https://evil.test/r/lobby?format=json' })],
-		['a mismatched baseURL', post({ text: 'x', context: 'workflow' }, { baseURL: 'https://evil.test' })],
-		['a protocol-relative URL', post({ text: 'x', context: 'workflow' }, { url: '//evil.test/r/lobby?format=json' })],
-		['a percent-encoded room', post({ text: 'x', context: 'workflow' }, { url: '/r/lob%62y?format=json' })],
-		['a path traversal', post({ text: 'x', context: 'workflow' }, { url: '/r/../kv/a?format=json' })],
+		[
+			'another origin',
+			post({ text: 'x', context: 'workflow' }, { url: 'https://evil.test/r/lobby?format=json' }),
+		],
+		[
+			'a mismatched baseURL',
+			post({ text: 'x', context: 'workflow' }, { baseURL: 'https://evil.test' }),
+		],
+		[
+			'a protocol-relative URL',
+			post({ text: 'x', context: 'workflow' }, { url: '//evil.test/r/lobby?format=json' }),
+		],
+		[
+			'a percent-encoded room',
+			post({ text: 'x', context: 'workflow' }, { url: '/r/lob%62y?format=json' }),
+		],
+		[
+			'a path traversal',
+			post({ text: 'x', context: 'workflow' }, { url: '/r/../kv/a?format=json' }),
+		],
 		['an invalid room', post({ text: 'x', context: 'workflow' }, { url: '/r/Lobby?format=json' })],
 		['the events room', post({ text: 'x', context: 'workflow' }, { url: '/r/events?format=json' })],
-		['an already signed body', post({ text: 'x', context: 'workflow', did: 'd', sig: 's', nonce: '1' })],
+		[
+			'an already signed body',
+			post({ text: 'x', context: 'workflow', did: 'd', sig: 's', nonce: '1' }),
+		],
 		['a canonical string instead of text', post({ canonical: 'lobby|1|x', context: 'workflow' })],
 		['a string body', post('{"text":"x"}')],
 		['a missing context', post({ text: 'x' })],
@@ -102,7 +141,9 @@ describe('TechnocoreSigningKeyApi credential', () => {
 	});
 
 	it('refuses AI tool context unless the credential allows it', async () => {
-		const denied = await refusal(authenticateSigningRequest({ ...creds }, post({ text: 'x', context: 'aiTool' }), () => NOW));
+		const denied = await refusal(
+			authenticateSigningRequest({ ...creds }, post({ text: 'x', context: 'aiTool' }), () => NOW),
+		);
 		expect(denied).toMatch(/AI agent tool are disabled/);
 		const allowed = await authenticateSigningRequest(
 			{ ...creds, allowAiToolSigning: true },
@@ -114,7 +155,11 @@ describe('TechnocoreSigningKeyApi credential', () => {
 
 	it('refuses a plain-http origin that is not loopback, accepts localhost', async () => {
 		const insecure = await refusal(
-			authenticateSigningRequest({ ...creds, origin: 'http://technocore.test' }, post({ text: 'x', context: 'workflow' }), () => NOW),
+			authenticateSigningRequest(
+				{ ...creds, origin: 'http://technocore.test' },
+				post({ text: 'x', context: 'workflow' }),
+				() => NOW,
+			),
 		);
 		expect(insecure).toMatch(/https/);
 		const local = await authenticateSigningRequest(
@@ -126,7 +171,11 @@ describe('TechnocoreSigningKeyApi credential', () => {
 	});
 
 	it('counts 4096 characters as code points (astral characters are one)', async () => {
-		const sent = await authenticateSigningRequest({ ...creds }, post({ text: cp(0x1f600).repeat(4096), context: 'workflow' }), () => NOW);
+		const sent = await authenticateSigningRequest(
+			{ ...creds },
+			post({ text: cp(0x1f600).repeat(4096), context: 'workflow' }),
+			() => NOW,
+		);
 		expect((sent.body as Record<string, string>).text.length).toBe(8192);
 	});
 });
@@ -151,16 +200,28 @@ describe('TechnocoreApi credential', () => {
 
 	it('holds no secret and pins requests to the configured origin', async () => {
 		expect(credential.properties.some((p) => p.typeOptions?.password)).toBe(false);
-		const sent = await credential.authenticate({ origin: `${ORIGIN}/` }, { method: 'GET', url: '/r/lobby?limit=1&format=json' });
+		const sent = await credential.authenticate(
+			{ origin: `${ORIGIN}/` },
+			{ method: 'GET', url: '/r/lobby?limit=1&format=json' },
+		);
 		expect(sent.url).toBe(`${ORIGIN}/r/lobby?limit=1&format=json`);
-		await expect(credential.authenticate({ origin: ORIGIN }, { method: 'GET', url: 'https://elsewhere.test/r/x' })).rejects.toThrow(
-			/not on the credential origin/,
-		);
-		await expect(credential.authenticate({ origin: 'https://technocore.test/path' }, { method: 'GET', url: '/x' })).rejects.toThrow(
-			/scheme and host only/,
-		);
-		await expect(credential.authenticate({ origin: 'https://user:pw@technocore.test' }, { method: 'GET', url: '/x' })).rejects.toThrow(
-			/user name or password/,
-		);
+		await expect(
+			credential.authenticate(
+				{ origin: ORIGIN },
+				{ method: 'GET', url: 'https://elsewhere.test/r/x' },
+			),
+		).rejects.toThrow(/not on the credential origin/);
+		await expect(
+			credential.authenticate(
+				{ origin: 'https://technocore.test/path' },
+				{ method: 'GET', url: '/x' },
+			),
+		).rejects.toThrow(/scheme and host only/);
+		await expect(
+			credential.authenticate(
+				{ origin: 'https://user:pw@technocore.test' },
+				{ method: 'GET', url: '/x' },
+			),
+		).rejects.toThrow(/user name or password/);
 	});
 });

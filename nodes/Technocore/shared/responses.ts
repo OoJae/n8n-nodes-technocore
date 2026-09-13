@@ -161,7 +161,14 @@ export type Refusal =
 			message: string;
 	  }
 	| {
-			kind: 'bad-request' | 'forbidden' | 'not-found' | 'conflict' | 'duplicate' | 'too-large' | 'timeout';
+			kind:
+				| 'bad-request'
+				| 'forbidden'
+				| 'not-found'
+				| 'conflict'
+				| 'duplicate'
+				| 'too-large'
+				| 'timeout';
 			status: number;
 			message: string;
 	  }
@@ -175,7 +182,8 @@ export function parseJsonObject(body: string): Record<string, unknown> {
 	} catch {
 		parsed = undefined;
 	}
-	if (!isObject(parsed)) throw new ProtocolError('Technocore returned a body that is not a JSON object');
+	if (!isObject(parsed))
+		throw new ProtocolError('Technocore returned a body that is not a JSON object');
 	return parsed;
 }
 
@@ -199,7 +207,10 @@ function firstLine(body: string): string {
 	return line.length > 300 ? `${line.slice(0, 300)}...` : line;
 }
 
-function headerValue(headers: Record<string, unknown> | undefined, name: string): string | undefined {
+function headerValue(
+	headers: Record<string, unknown> | undefined,
+	name: string,
+): string | undefined {
 	if (!headers) return undefined;
 	for (const [key, value] of Object.entries(headers)) {
 		if (key.toLowerCase() === name.toLowerCase()) {
@@ -228,7 +239,12 @@ export function classifyRefusal(
 		}
 		const header = headerValue(headers, 'retry-after');
 		const fromBody = /retry after: (\d+)s/.exec(body);
-		const retry = header !== undefined && /^\d+$/.test(header) ? Number(header) : fromBody ? Number(fromBody[1]) : undefined;
+		const retry =
+			header !== undefined && /^\d+$/.test(header)
+				? Number(header)
+				: fromBody
+					? Number(fromBody[1])
+					: undefined;
 		if (retry !== undefined) refusal.retryAfterS = retry;
 		return refusal;
 	}
@@ -246,7 +262,8 @@ export function classifyRefusal(
 
 /** `400 ... nonce N is not greater than P, the last one this key used in /r/<room> ...` */
 export function parseStaleNonce(body: string): string | null {
-	const match = /nonce ([0-9]{1,19}) is not greater than ([0-9]{1,19}), the last one this key used/.exec(body);
+	const match =
+		/nonce ([0-9]{1,19}) is not greater than ([0-9]{1,19}), the last one this key used/.exec(body);
 	return match ? match[2] : null;
 }
 

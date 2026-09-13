@@ -50,12 +50,18 @@ function node(type: string, name: string): INode {
 
 function makeHelpers(credentials: CredentialData, router: Router, requests: RecordedRequest[]) {
 	return {
-		async httpRequestWithAuthentication(credentialType: string, requestOptions: IHttpRequestOptions) {
+		async httpRequestWithAuthentication(
+			credentialType: string,
+			requestOptions: IHttpRequestOptions,
+		) {
 			const type = credentialTypes[credentialType as keyof typeof credentialTypes];
 			const data = credentials[credentialType as keyof CredentialData];
 			if (!type || !data) throw new Error(`no credentials of type ${credentialType}`);
 			const requested = structuredClone(requestOptions);
-			const sent = await type.authenticate({ ...data } as ICredentialDataDecryptedObject, requestOptions);
+			const sent = await type.authenticate(
+				{ ...data } as ICredentialDataDecryptedObject,
+				requestOptions,
+			);
 			requests.push({ credentialType, requested, sent });
 			const response = await router(sent);
 			return {
@@ -84,9 +90,12 @@ export interface PollStubOptions {
 export function makePollFunctions(options: PollStubOptions) {
 	const requests: RecordedRequest[] = [];
 	const staticData: IDataObject = options.staticData ?? {};
-	const credentials = options.credentials ?? { technocoreApi: { origin: 'https://technocore.test' } };
+	const credentials = options.credentials ?? {
+		technocoreApi: { origin: 'https://technocore.test' },
+	};
 	const fns = {
-		getNode: () => node(options.nodeType ?? 'n8n-nodes-technocore.technocoreTrigger', 'Technocore Trigger'),
+		getNode: () =>
+			node(options.nodeType ?? 'n8n-nodes-technocore.technocoreTrigger', 'Technocore Trigger'),
 		getMode: () => options.mode ?? 'trigger',
 		getActivationMode: () => 'activate',
 		getNodeParameter: (name: string, fallback?: unknown) =>
@@ -114,7 +123,9 @@ export interface ExecuteStubOptions {
 export function makeExecuteFunctions(options: ExecuteStubOptions) {
 	const requests: RecordedRequest[] = [];
 	const perItem = Array.isArray(options.params) ? options.params : [options.params];
-	const credentials = options.credentials ?? { technocoreApi: { origin: 'https://technocore.test' } };
+	const credentials = options.credentials ?? {
+		technocoreApi: { origin: 'https://technocore.test' },
+	};
 	const fns = {
 		getNode: () => node(options.nodeType ?? 'n8n-nodes-technocore.technocore', 'Technocore'),
 		getInputData: () => perItem.map(() => ({ json: {} })),

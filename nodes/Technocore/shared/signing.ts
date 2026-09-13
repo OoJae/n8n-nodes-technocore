@@ -41,7 +41,8 @@ export function nextNonce(nowMs: number, after?: string): string {
 	const bumped = lastNonce + BigInt(1);
 	if (bumped > candidate) candidate = bumped;
 	if (after !== undefined) {
-		if (!/^[0-9]{1,19}$/.test(after)) throw new SigningRefusedError('nonceAfter must be 1-19 digits');
+		if (!/^[0-9]{1,19}$/.test(after))
+			throw new SigningRefusedError('nonceAfter must be 1-19 digits');
 		const past = BigInt(after) + BigInt(1);
 		if (past > candidate) candidate = past;
 	}
@@ -66,7 +67,9 @@ export interface SigningCredentialData {
 const ALLOWED_BODY_KEYS = new Set(['text', 'context', 'nonceAfter']);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value) && !Buffer.isBuffer(value);
+	return (
+		typeof value === 'object' && value !== null && !Array.isArray(value) && !Buffer.isBuffer(value)
+	);
 }
 
 export async function authenticateSigningRequest(
@@ -82,8 +85,17 @@ export async function authenticateSigningRequest(
 	const qs = requestOptions.qs;
 	const hasQs = isPlainObject(qs) && Object.keys(qs).length > 0;
 
-	if (method === 'GET' && target.pathname === SIGNING_TEST_PATH && !target.search && !target.hash && !hasQs) {
-		if (requestOptions.body !== undefined && !(isPlainObject(requestOptions.body) && Object.keys(requestOptions.body).length === 0)) {
+	if (
+		method === 'GET' &&
+		target.pathname === SIGNING_TEST_PATH &&
+		!target.search &&
+		!target.hash &&
+		!hasQs
+	) {
+		if (
+			requestOptions.body !== undefined &&
+			!(isPlainObject(requestOptions.body) && Object.keys(requestOptions.body).length === 0)
+		) {
 			throw new SigningRefusedError('The credential test request must not carry a body');
 		}
 		return { ...requestOptions, url: target.href, baseURL: undefined };
@@ -101,12 +113,16 @@ export async function authenticateSigningRequest(
 	}
 	const body = requestOptions.body;
 	if (!isPlainObject(body) || Object.keys(body).some((key) => !ALLOWED_BODY_KEYS.has(key))) {
-		throw new SigningRefusedError('The signing credential only accepts a body of {text, context}; it never re-signs a signed body');
+		throw new SigningRefusedError(
+			'The signing credential only accepts a body of {text, context}; it never re-signs a signed body',
+		);
 	}
 	const { text, context, nonceAfter } = body;
 	if (typeof text !== 'string') throw new SigningRefusedError('The text to sign must be a string');
 	if (context !== 'workflow' && context !== 'aiTool') {
-		throw new SigningRefusedError('The signing request does not say whether it comes from a workflow or an AI tool');
+		throw new SigningRefusedError(
+			'The signing request does not say whether it comes from a workflow or an AI tool',
+		);
 	}
 	if (context === 'aiTool' && credentials.allowAiToolSigning !== true) {
 		throw new SigningRefusedError(

@@ -48,7 +48,17 @@ export async function startTechnocore(options = {}) {
 	};
 	const child = spawn(
 		'uv',
-		['run', 'uvicorn', '--app-dir', 'src', 'app:app', '--host', '127.0.0.1', '--port', String(port)],
+		[
+			'run',
+			'uvicorn',
+			'--app-dir',
+			'src',
+			'app:app',
+			'--host',
+			'127.0.0.1',
+			'--port',
+			String(port),
+		],
 		{ cwd: checkout, env, detached: true, stdio: ['ignore', 'ignore', 'pipe'] },
 	);
 	let stderr = '';
@@ -104,7 +114,8 @@ export async function postUnsigned(origin, room, from, text) {
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ from, text }),
 	});
-	if (response.status !== 200) throw new Error(`post failed ${response.status}: ${await response.text()}`);
+	if (response.status !== 200)
+		throw new Error(`post failed ${response.status}: ${await response.text()}`);
 	return response;
 }
 

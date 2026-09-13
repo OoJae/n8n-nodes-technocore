@@ -8,14 +8,19 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { Technocore } from '../../nodes/Technocore/Technocore.node';
 import { TechnocoreTrigger } from '../../nodes/TechnocoreTrigger/TechnocoreTrigger.node';
-import { identityFromSeed, parseSeedHex, verifyCanonical } from '../../nodes/Technocore/shared/didkey';
+import {
+	identityFromSeed,
+	parseSeedHex,
+	verifyCanonical,
+} from '../../nodes/Technocore/shared/didkey';
 import { TEST_SEEDS } from '../fixtures/corpus.mjs';
 import { makeRoot, mutateStore, removeRoot, startTechnocore } from '../harness/local-server.mjs';
 import { hasCheckout } from '../harness/python.mjs';
 import { makeExecuteFunctions, makePollFunctions, type CredentialData } from '../helpers/n8n-stubs';
 import { realRouter, type WireLog } from '../helpers/real-router';
 
-if (!hasCheckout()) throw new Error('integration tests need a technocore-chat checkout (TECHNOCORE_CHECKOUT) and uv');
+if (!hasCheckout())
+	throw new Error('integration tests need a technocore-chat checkout (TECHNOCORE_CHECKOUT) and uv');
 
 const trigger = new TechnocoreTrigger();
 const action = new Technocore();
@@ -30,7 +35,11 @@ interface Server {
 function credentialsFor(origin: string): CredentialData {
 	return {
 		technocoreApi: { origin, defaultNick: 'n8n-it' },
-		technocoreSigningKeyApi: { origin, privateKeySeed: TEST_SEEDS.seed01, allowAiToolSigning: false },
+		technocoreSigningKeyApi: {
+			origin,
+			privateKeySeed: TEST_SEEDS.seed01,
+			allowAiToolSigning: false,
+		},
 	};
 }
 
@@ -41,25 +50,40 @@ async function post(origin: string, room: string, count: number, prefix: string)
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ from: 'writer', text: `${prefix} number ${i}` }),
 		});
-		if (response.status !== 200) throw new Error(`post ${response.status}: ${await response.text()}`);
+		if (response.status !== 200)
+			throw new Error(`post ${response.status}: ${await response.text()}`);
 	}
 }
 
 function pollerFor(origin: string, params: IDataObject, staticData: IDataObject = {}) {
-	const allParams: IDataObject = { startFrom: 'now', maxMessagesPerPoll: 1000, emit: 'perMessage', backfillGaps: true, maxExportMB: 12, ...params };
+	const allParams: IDataObject = {
+		startFrom: 'now',
+		maxMessagesPerPoll: 1000,
+		emit: 'perMessage',
+		backfillGaps: true,
+		maxExportMB: 12,
+		...params,
+	};
 	return {
 		staticData,
 		async poll() {
 			const log: WireLog[] = [];
-			const stub = makePollFunctions({ params: allParams, staticData, router: realRouter(log), credentials: credentialsFor(origin) });
+			const stub = makePollFunctions({
+				params: allParams,
+				staticData,
+				router: realRouter(log),
+				credentials: credentialsFor(origin),
+			});
 			const result = await trigger.poll.call(stub.fns);
 			return { items: result ? result[0].map((item) => item.json) : null, log };
 		},
 	};
 }
 
-const seqs = (items: IDataObject[] | null) => (items ?? []).filter((i) => i.type === 'message').map((i) => i.seq as number);
-const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+const seqs = (items: IDataObject[] | null) =>
+	(items ?? []).filter((i) => i.type === 'message').map((i) => i.seq as number);
+const range = (from: number, to: number) =>
+	Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 describe('trigger against a local server', () => {
 	let server: Server;
@@ -80,9 +104,16 @@ describe('trigger against a local server', () => {
 
 		await post(server.origin, 'n8n-trig-burst', 8, 'burst');
 		const { items, log } = await poller.poll();
-		expect(log.map((l) => l.url)).toEqual([`${server.origin}/r/n8n-trig-burst?since=3&limit=200&format=json`]);
+		expect(log.map((l) => l.url)).toEqual([
+			`${server.origin}/r/n8n-trig-burst?since=3&limit=200&format=json`,
+		]);
 		expect(seqs(items)).toEqual(range(4, 11));
-		expect(items?.[0]).toMatchObject({ untrusted: true, signed: false, from: 'writer', text: 'burst number 1' });
+		expect(items?.[0]).toMatchObject({
+			untrusted: true,
+			signed: false,
+			from: 'writer',
+			text: 'burst number 1',
+		});
 		expect((await poller.poll()).items).toBeNull();
 	});
 
@@ -91,7 +122,10 @@ describe('trigger against a local server', () => {
 		await poller.poll();
 		await post(server.origin, 'n8n-trig-backlog', 450, 'backlog');
 		const { items, log } = await poller.poll();
-		expect(log.map((l) => l.url.replace(server.origin, ''))).toEqual(['/r/n8n-trig-backlog?since=0&limit=200&format=json', '/r/n8n-trig-backlog/export']);
+		expect(log.map((l) => l.url.replace(server.origin, ''))).toEqual([
+			'/r/n8n-trig-backlog?since=0&limit=200&format=json',
+			'/r/n8n-trig-backlog/export',
+		]);
 		expect(seqs(items)).toEqual(range(1, 450));
 		expect(items?.some((i) => i.type === 'gap')).toBe(false);
 		expect(poller.staticData.technocore).toMatchObject({ cursor: 450 });
@@ -101,15 +135,31 @@ describe('trigger against a local server', () => {
 		const poller = pollerFor(server.origin, { room: 'n8n-trig-signed' });
 		await poller.poll();
 		const stub = makeExecuteFunctions({
-			params: { resource: 'room', operation: 'postSigned', room: 'n8n-trig-signed', signedText: 'signed for the trigger' },
+			params: {
+				resource: 'room',
+				operation: 'postSigned',
+				room: 'n8n-trig-signed',
+				signedText: 'signed for the trigger',
+			},
 			router: realRouter(),
 			credentials: credentialsFor(server.origin),
 		});
 		await action.execute.call(stub.fns);
 		const { items } = await poller.poll();
 		expect(items).toHaveLength(1);
-		expect(items?.[0]).toMatchObject({ type: 'message', signed: true, from: identity.did, text: 'signed for the trigger' });
-		expect(verifyCanonical(identity.did, items?.[0].sig as string, `n8n-trig-signed|${items?.[0].nonce}|signed for the trigger`)).toBe(true);
+		expect(items?.[0]).toMatchObject({
+			type: 'message',
+			signed: true,
+			from: identity.did,
+			text: 'signed for the trigger',
+		});
+		expect(
+			verifyCanonical(
+				identity.did,
+				items?.[0].sig as string,
+				`n8n-trig-signed|${items?.[0].nonce}|signed for the trigger`,
+			),
+		).toBe(true);
 	});
 
 	it('manual mode shows the newest messages without moving the cursor', async () => {
@@ -126,7 +176,9 @@ describe('trigger against a local server', () => {
 		});
 		const result = await trigger.poll.call(stub.fns);
 		expect(result?.[0].map((i) => i.json.seq)).toEqual([11, 12]);
-		expect(manualLog.map((l) => l.url.replace(server.origin, ''))).toEqual(['/r/n8n-trig-burst?limit=2&format=json']);
+		expect(manualLog.map((l) => l.url.replace(server.origin, ''))).toEqual([
+			'/r/n8n-trig-burst?limit=2&format=json',
+		]);
 		expect(burstState).toEqual(before);
 		const after = await pollerFor(server.origin, { room: 'n8n-trig-burst' }, burstState).poll();
 		expect(seqs(after.items)).toEqual([12]);
@@ -152,12 +204,21 @@ describe('trigger across room recreation (server stopped, store mutated, restart
 
 		const port = server.port;
 		await server.stop();
-		mutateStore(root, 'n8n-reaped', 'store._set_seq_entry(root, room, store.last_seq(root, room)); store.room_path(root, room).unlink()');
+		mutateStore(
+			root,
+			'n8n-reaped',
+			'store._set_seq_entry(root, room, store.last_seq(root, room)); store.room_path(root, room).unlink()',
+		);
 		server = await startTechnocore({ root, port });
 		await post(server.origin, 'n8n-reaped', 3, 'gen two');
 
 		const { items } = await poller.poll();
-		expect(items?.[0]).toMatchObject({ type: 'recreated', fromGeneration: 1, toGeneration: 2, previousCursor: 10 });
+		expect(items?.[0]).toMatchObject({
+			type: 'recreated',
+			fromGeneration: 1,
+			toGeneration: 2,
+			previousCursor: 10,
+		});
 		expect(items?.[1]).toMatchObject({ type: 'gap', from: 11, to: 15, reason: 'recreated' });
 		expect(seqs(items)).toEqual([16, 17, 18]);
 		expect(poller.staticData.technocore).toMatchObject({ cursor: 18, generation: 2 });
@@ -176,7 +237,14 @@ describe('trigger across room recreation (server stopped, store mutated, restart
 		await post(server.origin, 'n8n-lost', 4, 'new');
 
 		const { items } = await poller.poll();
-		expect(items?.map((i) => i.type)).toEqual(['recreated', 'reset', 'message', 'message', 'message', 'message']);
+		expect(items?.map((i) => i.type)).toEqual([
+			'recreated',
+			'reset',
+			'message',
+			'message',
+			'message',
+			'message',
+		]);
 		expect(items?.[1]).toMatchObject({ previousCursor: 20, firstSeq: 1 });
 		expect(seqs(items)).toEqual([1, 2, 3, 4]);
 	});
@@ -212,7 +280,9 @@ describe('trigger under a real 429', () => {
 		}
 		expect(error).toBeInstanceOf(NodeApiError);
 		expect((error as NodeApiError).httpCode).toBe('429');
-		expect((error as NodeApiError).message).toContain('429 rate limited: the read budget for your IP (3/min)');
+		expect((error as NodeApiError).message).toContain(
+			'429 rate limited: the read budget for your IP (3/min)',
+		);
 		expect((error as NodeApiError).description).toMatch(/Retry after \d+s/);
 		expect(poller.staticData).toEqual(before);
 	});

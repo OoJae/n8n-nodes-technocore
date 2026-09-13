@@ -39,7 +39,9 @@ export function normalizeOrigin(value: unknown): string {
 	}
 	const loopback = LOOPBACK_HOSTS.has(url.hostname);
 	if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) {
-		throw new OriginError('The Technocore origin must use https (plain http is allowed for localhost only)');
+		throw new OriginError(
+			'The Technocore origin must use https (plain http is allowed for localhost only)',
+		);
 	}
 	return url.origin;
 }
@@ -55,7 +57,8 @@ export function resolveOnOrigin(origin: string, url: unknown, baseURL: unknown):
 	let base = origin;
 	if (baseURL !== undefined && baseURL !== null && baseURL !== '') {
 		base = normalizeOrigin(baseURL);
-		if (base !== origin) throw new OriginError('The Technocore request base URL is not the credential origin');
+		if (base !== origin)
+			throw new OriginError('The Technocore request base URL is not the credential origin');
 	}
 	let resolved: URL | null = null;
 	if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {

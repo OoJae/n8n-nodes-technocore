@@ -77,7 +77,9 @@ function sourceFiles() {
 	const upstream = upstreamFiles();
 	const unknown = upstream.filter((name) => !INCLUDE.includes(name) && !(name in EXCLUDED));
 	if (unknown.length) {
-		throw new Error(`technocore-watch-core has new protocol files (${unknown.join(', ')}): add each to INCLUDE or EXCLUDED`);
+		throw new Error(
+			`technocore-watch-core has new protocol files (${unknown.join(', ')}): add each to INCLUDE or EXCLUDED`,
+		);
 	}
 	return INCLUDE.filter((name) => upstream.includes(name));
 }
@@ -88,7 +90,6 @@ function vendoredFiles() {
 		.sort();
 }
 
-
 export function check() {
 	const errors = [];
 	const warnings = [];
@@ -96,7 +97,8 @@ export function check() {
 	const record = JSON.parse(readFileSync(VENDOR_FILE, 'utf8'));
 	const present = vendoredFiles();
 	const listed = Object.keys(record.files ?? {}).sort();
-	for (const name of present) if (!listed.includes(name)) errors.push(`${name} is not listed in VENDOR.json`);
+	for (const name of present)
+		if (!listed.includes(name)) errors.push(`${name} is not listed in VENDOR.json`);
 	for (const name of listed) {
 		if (!present.includes(name)) {
 			errors.push(`${name} is listed in VENDOR.json but missing`);
@@ -107,7 +109,8 @@ export function check() {
 			errors.push(`${name} was edited after vendoring (integrity mismatch)`);
 		}
 		const expectedBanner = banner(record.commit, name);
-		if (!content.toString('utf8').startsWith(expectedBanner)) errors.push(`${name} lost its vendoring banner`);
+		if (!content.toString('utf8').startsWith(expectedBanner))
+			errors.push(`${name} lost its vendoring banner`);
 	}
 	const drift = [];
 	if (coreAvailable()) {
@@ -147,7 +150,8 @@ function vendor() {
 		version = undefined;
 	}
 	const names = sourceFiles();
-	for (const stale of vendoredFiles()) if (!names.includes(stale)) unlinkSync(path.join(DEST, stale));
+	for (const stale of vendoredFiles())
+		if (!names.includes(stale)) unlinkSync(path.join(DEST, stale));
 	const files = {};
 	for (const name of names) {
 		const upstream = git(['show', `HEAD:${SOURCE_DIR}/${name}`]);
@@ -164,7 +168,9 @@ function vendor() {
 		excluded: EXCLUDED,
 	};
 	writeFileSync(VENDOR_FILE, `${JSON.stringify(record, null, '\t')}\n`);
-	console.log(`vendor-core: vendored ${names.length} file(s) from technocore-watch-core@${commit.slice(0, 7)}`);
+	console.log(
+		`vendor-core: vendored ${names.length} file(s) from technocore-watch-core@${commit.slice(0, 7)}`,
+	);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

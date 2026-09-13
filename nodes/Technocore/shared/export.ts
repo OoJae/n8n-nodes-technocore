@@ -80,7 +80,10 @@ export async function scanExport(body: unknown, options: ExportScanOptions): Pro
 			for await (const chunk of body) {
 				consumeChunk(chunk);
 				if (done) break;
-				if (scan.bytes > options.maxBytes || (options.deadline !== undefined && now() > options.deadline)) {
+				if (
+					scan.bytes > options.maxBytes ||
+					(options.deadline !== undefined && now() > options.deadline)
+				) {
 					scan.bounded = true;
 					break;
 				}
@@ -89,7 +92,8 @@ export async function scanExport(body: unknown, options: ExportScanOptions): Pro
 			destroy(body);
 		}
 	} else {
-		const text = typeof body === 'string' ? body : Buffer.isBuffer(body) ? body.toString('utf8') : '';
+		const text =
+			typeof body === 'string' ? body : Buffer.isBuffer(body) ? body.toString('utf8') : '';
 		const bytes = Buffer.byteLength(text, 'utf8');
 		if (bytes > options.maxBytes) {
 			// Already in memory; still honour the budget by only scanning the allowed prefix.

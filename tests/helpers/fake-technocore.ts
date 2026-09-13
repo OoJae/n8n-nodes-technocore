@@ -16,8 +16,9 @@ export const TEST_TS = '2026-09-13T12:00:00.000000+00:00';
 
 /** JSON with nonces as bare integer literals, like the server's json.dumps output. */
 export function serverJson(value: unknown, indent?: number): string {
-	return JSON.stringify(value, null, indent).replace(/"nonce": ?"([0-9]{1,19})"/g, (match, digits) =>
-		match.includes('": "') ? `"nonce": ${digits}` : `"nonce":${digits}`,
+	return JSON.stringify(value, null, indent).replace(
+		/"nonce": ?"([0-9]{1,19})"/g,
+		(match, digits) => (match.includes('": "') ? `"nonce": ${digits}` : `"nonce":${digits}`),
 	);
 }
 
@@ -81,7 +82,7 @@ export class FakeRoom {
 			room: this.name,
 			count: window.length,
 			first_seq: window.length ? window[0].seq : null,
-			last_seq: window.length ? window[window.length - 1].seq : since ?? 0,
+			last_seq: window.length ? window[window.length - 1].seq : (since ?? 0),
 			generation: this.generation,
 			messages: window,
 		};
@@ -89,7 +90,10 @@ export class FakeRoom {
 	}
 
 	exportBody(): string {
-		return this.records.map((record) => serverJson(record)).join('\n') + (this.records.length ? '\n' : '');
+		return (
+			this.records.map((record) => serverJson(record)).join('\n') +
+			(this.records.length ? '\n' : '')
+		);
 	}
 }
 

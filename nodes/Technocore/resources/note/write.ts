@@ -1,4 +1,9 @@
-import { NodeOperationError, type IDataObject, type IExecuteFunctions, type INodeProperties } from 'n8n-workflow';
+import {
+	NodeOperationError,
+	type IDataObject,
+	type IExecuteFunctions,
+	type INodeProperties,
+} from 'n8n-workflow';
 
 import { parseJsonObject } from '../../shared/responses';
 import { API_CREDENTIAL, isSuccess, refusalError, requestText } from '../../shared/transport';
@@ -53,8 +58,16 @@ export const noteWriteDescription: INodeProperties[] = [
 	},
 ];
 
-export async function noteWrite(this: IExecuteFunctions, itemIndex: number): Promise<IDataObject[]> {
-	const ns = validName(this, this.getNodeParameter('namespace', itemIndex, ''), 'namespace', itemIndex);
+export async function noteWrite(
+	this: IExecuteFunctions,
+	itemIndex: number,
+): Promise<IDataObject[]> {
+	const ns = validName(
+		this,
+		this.getNodeParameter('namespace', itemIndex, ''),
+		'namespace',
+		itemIndex,
+	);
 	const key = validName(this, this.getNodeParameter('key', itemIndex, ''), 'key', itemIndex);
 	const value = this.getNodeParameter('value', itemIndex, '') as string;
 	if (typeof value !== 'string' || value.trim() === '') {

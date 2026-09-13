@@ -10,10 +10,16 @@ import type { GapRecord } from './poll';
 import type { Message } from './protocol/types.ts';
 
 export function isSignedMessage(message: Message): boolean {
-	return isDid(message.from) && typeof message.sig === 'string' && typeof message.nonce === 'string';
+	return (
+		isDid(message.from) && typeof message.sig === 'string' && typeof message.nonce === 'string'
+	);
 }
 
-export function messageItem(room: string, generation: number | undefined, message: Message): IDataObject {
+export function messageItem(
+	room: string,
+	generation: number | undefined,
+	message: Message,
+): IDataObject {
 	const item: IDataObject = {
 		type: 'message',
 		untrusted: true,

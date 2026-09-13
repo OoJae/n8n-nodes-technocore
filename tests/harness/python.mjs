@@ -17,7 +17,10 @@ export function checkoutPath() {
 
 export function hasCheckout() {
 	const root = checkoutPath();
-	return existsSync(path.join(root, 'scripts', 'sign.py')) && existsSync(path.join(root, 'src', 'store.py'));
+	return (
+		existsSync(path.join(root, 'scripts', 'sign.py')) &&
+		existsSync(path.join(root, 'src', 'store.py'))
+	);
 }
 
 function uv(args, { cwd, input, env } = {}) {
@@ -30,7 +33,9 @@ function uv(args, { cwd, input, env } = {}) {
 	});
 	if (result.error) throw result.error;
 	if (result.status !== 0) {
-		throw new Error(`uv ${args.slice(0, 3).join(' ')} failed (${result.status}): ${result.stderr.slice(0, 2000)}`);
+		throw new Error(
+			`uv ${args.slice(0, 3).join(' ')} failed (${result.status}): ${result.stderr.slice(0, 2000)}`,
+		);
 	}
 	return result.stdout;
 }
@@ -41,7 +46,9 @@ function uv(args, { cwd, input, env } = {}) {
  */
 export function signPy(seedHex, args) {
 	const root = checkoutPath();
-	return uv(['run', path.join(root, 'scripts', 'sign.py'), '--seed', seedHex, ...args], { cwd: root })
+	return uv(['run', path.join(root, 'scripts', 'sign.py'), '--seed', seedHex, ...args], {
+		cwd: root,
+	})
 		.split('\n')
 		.filter(Boolean);
 }
@@ -60,5 +67,7 @@ export function pythonBatch(request) {
 /** Regenerates the sweep table with the server's Python; returns the TS source. */
 export function generateSweepTable() {
 	const root = checkoutPath();
-	return uv(['run', 'python', path.join(PACKAGE_ROOT, 'scripts', 'gen-sweep-table.py')], { cwd: root });
+	return uv(['run', 'python', path.join(PACKAGE_ROOT, 'scripts', 'gen-sweep-table.py')], {
+		cwd: root,
+	});
 }

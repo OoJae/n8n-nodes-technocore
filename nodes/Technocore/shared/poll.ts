@@ -57,18 +57,26 @@ export type TriggerEvent =
  *   generation does not hold are a `recreated` gap, and a first seq at or below
  *   `previousCursor` means the sequence restarted (a `reset` event).
  */
-export type LeadingMode = { mode: 'report' } | { mode: 'suppress' } | { mode: 'recreated'; previousCursor: number };
+export type LeadingMode =
+	| { mode: 'report' }
+	| { mode: 'suppress' }
+	| { mode: 'recreated'; previousCursor: number };
 
 export function readState(data: unknown, origin: string, room: string): TriggerState | null {
 	if (typeof data !== 'object' || data === null) return null;
 	const state = data as Partial<TriggerState>;
 	if (state.v !== STATE_VERSION || state.origin !== origin || state.room !== room) return null;
-	if (typeof state.cursor !== 'number' || !Number.isSafeInteger(state.cursor) || state.cursor < 0) return null;
+	if (typeof state.cursor !== 'number' || !Number.isSafeInteger(state.cursor) || state.cursor < 0)
+		return null;
 	const out: TriggerState = { v: STATE_VERSION, origin, room, cursor: state.cursor };
 	if (typeof state.generation === 'number' && Number.isSafeInteger(state.generation)) {
 		out.generation = state.generation;
 	}
-	if (typeof state.recreatedFrom === 'number' && Number.isSafeInteger(state.recreatedFrom) && state.recreatedFrom >= 0) {
+	if (
+		typeof state.recreatedFrom === 'number' &&
+		Number.isSafeInteger(state.recreatedFrom) &&
+		state.recreatedFrom >= 0
+	) {
 		out.recreatedFrom = state.recreatedFrom;
 	}
 	return out;
@@ -108,7 +116,8 @@ function holeReason(from: number, isLeading: boolean, input: AssembleInput): Gap
 		return 'backfill-bounded';
 	}
 	if (isLeading && scan.oldestSeq !== undefined && from < scan.oldestSeq) return 'ring-dropped';
-	if (isLeading && scan.oldestSeq === undefined) return scan.bounded ? 'backfill-bounded' : 'ring-dropped';
+	if (isLeading && scan.oldestSeq === undefined)
+		return scan.bounded ? 'backfill-bounded' : 'ring-dropped';
 	return 'missing';
 }
 
@@ -147,7 +156,12 @@ export function assemble(input: AssembleInput): AssembleResult {
 				events.push({ type: 'gap', gap: { from, to, reason: holeReason(from, first, input) } });
 			}
 		}
-		if (first && leading.mode === 'recreated' && seq <= leading.previousCursor && seq === next + 1) {
+		if (
+			first &&
+			leading.mode === 'recreated' &&
+			seq <= leading.previousCursor &&
+			seq === next + 1
+		) {
 			events.push({ type: 'reset', previousCursor: leading.previousCursor, firstSeq: seq });
 		}
 		first = false;

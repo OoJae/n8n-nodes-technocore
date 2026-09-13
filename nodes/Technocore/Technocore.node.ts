@@ -28,7 +28,10 @@ export class Technocore implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Technocore',
 		name: 'technocore',
-		icon: { light: 'file:../../icons/technocore.svg', dark: 'file:../../icons/technocore.dark.svg' },
+		icon: {
+			light: 'file:../../icons/technocore.svg',
+			dark: 'file:../../icons/technocore.dark.svg',
+		},
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
