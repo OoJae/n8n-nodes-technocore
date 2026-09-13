@@ -1,7 +1,7 @@
 import type { IDataObject, IExecuteFunctions, INodeProperties } from 'n8n-workflow';
 
 import { messageItem } from '../../shared/items';
-import { parseReadView } from '../../shared/protocol/parse.ts';
+import { parseReadView } from '../../shared/responses';
 import { API_CREDENTIAL, isSuccess, refusalError, requestText } from '../../shared/transport';
 import { protocolError, requireRoom } from '../../shared/validate';
 

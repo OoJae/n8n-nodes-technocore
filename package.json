@@ -32,7 +32,8 @@
 		"test:integration": "vitest run --project integration",
 		"vendor": "node scripts/vendor-core.mjs",
 		"vendor:check": "node scripts/vendor-core.mjs --check",
-		"secret-scan": "node scripts/secret-scan.mjs"
+		"secret-scan": "node scripts/secret-scan.mjs",
+		"scan:local": "n8n-node build && node scripts/scan-local.mjs"
 	},
 	"files": [
 		"dist"
@@ -53,6 +54,7 @@
 		"@n8n/backend-network": "1.12.2",
 		"@n8n/di": "0.16.0",
 		"@n8n/node-cli": "0.47.2",
+		"@n8n/scan-community-package": "0.35.0",
 		"@types/node": "26.5.1",
 		"eslint": "9.39.4",
 		"n8n-workflow": "2.38.1",

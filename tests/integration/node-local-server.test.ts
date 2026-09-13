@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { Technocore } from '../../nodes/Technocore/Technocore.node';
 import { canonicalMessage, identityFromSeed, parseSeedHex, signCanonical, verifyCanonical } from '../../nodes/Technocore/shared/didkey';
-import { parseReadView } from '../../nodes/Technocore/shared/protocol/parse';
+import { parseReadView } from '../../nodes/Technocore/shared/responses';
 import { sweep } from '../../nodes/Technocore/shared/sweep';
 import { KAT_ITEMS, TEST_SEEDS, cp } from '../fixtures/corpus.mjs';
 import { startTechnocore } from '../harness/local-server.mjs';

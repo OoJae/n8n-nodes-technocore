@@ -20,7 +20,7 @@ import {
 	type TriggerEvent,
 	type TriggerState,
 } from '../Technocore/shared/poll';
-import { parseReadView } from '../Technocore/shared/protocol/parse.ts';
+import { parseReadView } from '../Technocore/shared/responses';
 import type { ReadView } from '../Technocore/shared/protocol/types.ts';
 import {
 	API_CREDENTIAL,

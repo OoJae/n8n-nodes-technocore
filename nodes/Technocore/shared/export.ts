@@ -6,7 +6,7 @@
  * before `beforeSeq`, or when the byte or time budget runs out, and keeps only records in
  * (afterSeq, beforeSeq).
  */
-import { parseExportLine } from './protocol/parse.ts';
+import { parseExportLine } from './responses';
 import type { Message } from './protocol/types.ts';
 
 export interface ExportScan {

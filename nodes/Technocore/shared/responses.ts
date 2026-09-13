@@ -1,13 +1,153 @@
 /**
- * Response helpers specific to the n8n nodes. Room views and export lines are parsed by the
- * vendored technocore-watch-core protocol (bigint-safe nonces); this file adds what the
- * nodes need on top: the POST reply's `posted` record, note bodies, refusal classification
- * with the message text for NodeApiError, and the stale-nonce / canonical-string hints.
+ * Parsing of Technocore responses for the n8n nodes. Pure: strings in, values out.
+ *
+ * Nonces are stored as JSON integers of up to 19 digits, past Number's 2^53, so every
+ * `"nonce": <integer>` member is rewritten to a string literal by a JSON-aware scanner
+ * before JSON.parse (a regex would also rewrite look-alikes inside message text).
+ *
+ * technocore-watch-core has an equivalent parse.ts; it is not vendored because it throws
+ * inside a catch clause, which the n8n community-node rules reject (see VENDOR.json). The
+ * message and view types are the vendored ones.
  */
-import { ProtocolError, parseReadView, quoteNonceNumbers, toMessage } from './protocol/parse.ts';
 import type { Message, ReadView } from './protocol/types.ts';
 
-export { ProtocolError };
+export class ProtocolError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'ProtocolError';
+	}
+}
+
+const WS = new Set([' ', '\t', '\n', '\r']);
+
+/**
+ * Returns `json` with the integer value of every object member named `nonce` quoted.
+ * Walks the text once, tracking string boundaries and escapes, so text inside string
+ * values is never touched. Non-integer values are left alone.
+ */
+export function quoteNonceIntegers(json: string): string {
+	let out = '';
+	let i = 0;
+	let lastString: string | null = null;
+	const n = json.length;
+	while (i < n) {
+		const ch = json[i];
+		if (ch === '"') {
+			let j = i + 1;
+			while (j < n && json[j] !== '"') j += json[j] === '\\' ? 2 : 1;
+			lastString = json.slice(i + 1, Math.min(j, n));
+			out += json.slice(i, j + 1);
+			i = j + 1;
+			continue;
+		}
+		if (WS.has(ch)) {
+			out += ch;
+			i++;
+			continue;
+		}
+		if (ch === ':') {
+			out += ch;
+			i++;
+			if (lastString === 'nonce') {
+				while (i < n && WS.has(json[i])) out += json[i++];
+				let k = i;
+				if (json[k] === '-') k++;
+				while (k < n && json[k] >= '0' && json[k] <= '9') k++;
+				const literal = json.slice(i, k);
+				const next = json[k];
+				if (/^-?[0-9]+$/.test(literal) && next !== '.' && next !== 'e' && next !== 'E') {
+					out += `"${literal}"`;
+					i = k;
+				}
+			}
+			lastString = null;
+			continue;
+		}
+		lastString = null;
+		out += ch;
+		i++;
+	}
+	return out;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toMessage(value: unknown): Message | null {
+	if (!isObject(value)) return null;
+	const { seq, ts, from, text, nonce, sig } = value;
+	if (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 1) return null;
+	if (typeof ts !== 'string' || typeof from !== 'string' || typeof text !== 'string') return null;
+	const message: Message = { seq, ts, from, text };
+	if (typeof nonce === 'string' && /^[0-9]{1,19}$/.test(nonce)) message.nonce = nonce;
+	if (typeof sig === 'string') message.sig = sig;
+	return message;
+}
+
+/** Parses a `GET /r/<room>?format=json` body (also the `POST` reply's view part). */
+function parseView(body: string): ReadView & { posted?: Message } {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(quoteNonceIntegers(body));
+	} catch {
+		parsed = undefined;
+	}
+	if (!isObject(parsed)) {
+		throw new ProtocolError('Technocore returned a room view that is not a JSON object');
+	}
+	const { room, count, first_seq, last_seq, generation, messages, wait_held, posted } = parsed;
+	if (typeof room !== 'string' || typeof last_seq !== 'number' || !Array.isArray(messages)) {
+		throw new ProtocolError('Technocore returned a room view without room, last_seq or messages');
+	}
+	const parsedMessages: Message[] = [];
+	for (const entry of messages) {
+		const message = toMessage(entry);
+		if (!message) throw new ProtocolError('Technocore returned a malformed message record');
+		parsedMessages.push(message);
+	}
+	const view: ReadView & { posted?: Message } = {
+		room,
+		count: typeof count === 'number' ? count : parsedMessages.length,
+		first_seq: typeof first_seq === 'number' ? first_seq : null,
+		last_seq,
+		messages: parsedMessages,
+	};
+	if (typeof generation === 'number' && Number.isSafeInteger(generation)) {
+		view.generation = generation;
+	}
+	if (typeof wait_held === 'boolean') view.wait_held = wait_held;
+	const postedMessage = toMessage(posted);
+	if (postedMessage) view.posted = postedMessage;
+	return view;
+}
+
+/**
+ * One line of `GET /r/<room>/export` (raw stored JSONL). Returns null for a blank or
+ * unparseable line: the store heals a torn record by skipping it, and so does this.
+ */
+export function parseExportLine(line: string): Message | null {
+	const trimmed = line.trim();
+	if (!trimmed) return null;
+	try {
+		return toMessage(JSON.parse(quoteNonceIntegers(trimmed)));
+	} catch {
+		return null;
+	}
+}
+
+/** Parses a `GET /r/<room>?format=json` body. */
+export function parseReadView(body: string): ReadView {
+	const view = parseView(body);
+	delete view.posted;
+	return view;
+}
+
+/** A room write reply: the read view plus the `posted` record that landed. */
+export function parseRoomReply(body: string): { view: ReadView; posted?: Message } {
+	const { posted, ...view } = parseView(body);
+	return { view, posted };
+}
 
 export type RateBucket = 'read' | 'write' | 'rooms';
 
@@ -26,19 +166,6 @@ export type Refusal =
 			message: string;
 	  }
 	| { kind: 'server'; status: number; message: string };
-
-function isObject(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** A room write reply: the read view plus the `posted` record that landed. */
-export function parseRoomReply(body: string): { view: ReadView; posted?: Message } {
-	const view = parseReadView(body);
-	let posted: Message | undefined;
-	const raw: unknown = JSON.parse(quoteNonceNumbers(body));
-	if (isObject(raw) && raw.posted !== undefined) posted = toMessage(raw.posted);
-	return { view, posted };
-}
 
 /** Parses a note write reply (`POST /kv/<ns>/<key>?format=json`). */
 export function parseJsonObject(body: string): Record<string, unknown> {

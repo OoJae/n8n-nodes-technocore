@@ -5,7 +5,7 @@
 // so the node cannot import the core package: the pure, I/O-free protocol code is copied
 // in verbatim (plus a provenance banner) and pinned by integrity hashes in VENDOR.json.
 //
-//   node scripts/vendor-core.mjs          copy src/protocol/*.ts from the core repo's git HEAD
+//   node scripts/vendor-core.mjs          copy the INCLUDE files of src/protocol from the core repo's git HEAD
 //   node scripts/vendor-core.mjs --check  fail when a vendored file no longer matches VENDOR.json,
 //                                         or (when the core checkout is present) when the core's
 //                                         HEAD has moved on from what was vendored
@@ -13,9 +13,8 @@
 // Source: $TECHNOCORE_WATCH_CORE, else ../technocore-watch-core next to this repo. Files are
 // read from the committed HEAD (never a half-edited working tree).
 //
-// The banner is a provenance line, plus (only for files listed in LINT_EXCEPTIONS) a scoped
-// eslint-disable: parse.ts is pure protocol code that throws its own ProtocolError, which
-// every call site in this package converts to NodeOperationError. Nothing else is changed.
+// Only the files in INCLUDE are copied; EXCLUDED records why the rest are not. The one
+// change to each file is a provenance comment line at the top.
 // Integrity values use the SRI form (sha256-<base64>) so no 64-hex strings are committed.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -35,17 +34,20 @@ export function integrity(content) {
 	return `sha256-${createHash('sha256').update(content).digest('base64')}`;
 }
 
-// Files whose upstream code trips a community-node lint rule that does not apply to pure
-// protocol code. Kept explicit: a new exception must be added here deliberately.
-export const LINT_EXCEPTIONS = {
-	'parse.ts': [
-		'@n8n/community-nodes/require-node-api-error -- pure protocol code throws ProtocolError; call sites map it to NodeOperationError',
-	],
+// The protocol files this package uses. Everything else in src/protocol is left out on
+// purpose, with the reason recorded in VENDOR.json:
+export const INCLUDE = ['names.ts', 'sweep.ts', 'types.ts'];
+export const EXCLUDED = {
+	'parse.ts':
+		'throws inside a catch clause, which the n8n community-node rule require-node-api-error rejects; the n8n package scanner lints sources with inline eslint-disable comments ignored, so the file cannot ship under nodes/. nodes/Technocore/shared/responses.ts carries an equivalent bigint-safe parser until upstream changes.',
+	'index.ts': 're-exports parse.ts, reconcile.ts and render.ts.',
+	'reconcile.ts':
+		"not used: the trigger's cursor rules differ (per-poll message cap, no ack cursor) and live in nodes/Technocore/shared/poll.ts.",
+	'render.ts': 'not used: the n8n nodes emit items, not notices.',
 };
 
 export function banner(commit, name) {
-	const disables = (LINT_EXCEPTIONS[name] ?? []).map((rule) => `/* eslint-disable ${rule} */\n`).join('');
-	return `// VENDORED from technocore-watch-core@${commit} ${SOURCE_DIR}/${name} - do not edit; run \`npm run vendor\`.\n${disables}`;
+	return `// VENDORED from technocore-watch-core@${commit} ${SOURCE_DIR}/${name} - do not edit; run \`npm run vendor\`.\n`;
 }
 
 function git(args) {
@@ -62,7 +64,7 @@ function coreAvailable() {
 	}
 }
 
-function sourceFiles() {
+function upstreamFiles() {
 	return git(['ls-tree', '--name-only', 'HEAD', `${SOURCE_DIR}/`])
 		.toString('utf8')
 		.split('\n')
@@ -71,11 +73,21 @@ function sourceFiles() {
 		.sort();
 }
 
+function sourceFiles() {
+	const upstream = upstreamFiles();
+	const unknown = upstream.filter((name) => !INCLUDE.includes(name) && !(name in EXCLUDED));
+	if (unknown.length) {
+		throw new Error(`technocore-watch-core has new protocol files (${unknown.join(', ')}): add each to INCLUDE or EXCLUDED`);
+	}
+	return INCLUDE.filter((name) => upstream.includes(name));
+}
+
 function vendoredFiles() {
 	return readdirSync(DEST)
 		.filter((name) => name.endsWith('.ts'))
 		.sort();
 }
+
 
 export function check() {
 	const errors = [];
@@ -100,12 +112,18 @@ export function check() {
 	const drift = [];
 	if (coreAvailable()) {
 		const head = git(['rev-parse', 'HEAD']).toString().trim();
+		let tracked = [];
+		try {
+			tracked = sourceFiles();
+		} catch (error) {
+			warnings.push(error.message);
+		}
 		if (head !== record.commit) {
-			for (const name of sourceFiles()) {
+			for (const name of tracked) {
 				const upstream = git(['show', `HEAD:${SOURCE_DIR}/${name}`]);
 				if (record.files?.[name]?.source !== integrity(upstream)) drift.push(name);
 			}
-			for (const name of listed) if (!sourceFiles().includes(name)) drift.push(name);
+			for (const name of listed) if (!upstreamFiles().includes(name)) drift.push(name);
 			if (drift.length) {
 				warnings.push(
 					`technocore-watch-core HEAD ${head.slice(0, 7)} differs from vendored ${String(record.commit).slice(0, 7)} in: ${drift.join(', ')}. Run npm run vendor.`,
@@ -141,8 +159,9 @@ function vendor() {
 		source: `technocore-watch-core/${SOURCE_DIR}`,
 		version,
 		commit,
-		transform: 'banner prepended (provenance line; scoped eslint-disable for files in LINT_EXCEPTIONS); upstream bytes otherwise unchanged',
+		transform: 'one provenance comment line prepended; upstream bytes otherwise unchanged',
 		files,
+		excluded: EXCLUDED,
 	};
 	writeFileSync(VENDOR_FILE, `${JSON.stringify(record, null, '\t')}\n`);
 	console.log(`vendor-core: vendored ${names.length} file(s) from technocore-watch-core@${commit.slice(0, 7)}`);

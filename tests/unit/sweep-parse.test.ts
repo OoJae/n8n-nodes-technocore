@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { isDid, isMailbox, isValidName, roomClasses } from '../../nodes/Technocore/shared/names';
-import { parseExportLine, parseReadView, quoteNonceNumbers } from '../../nodes/Technocore/shared/protocol/parse';
 import { sweepText as vendoredSweep } from '../../nodes/Technocore/shared/protocol/sweep';
 import {
 	classifyRefusal as parseRefusal,
+	parseExportLine,
+	parseReadView,
+	quoteNonceIntegers as quoteNonceNumbers,
 	parseExpectedCanonical,
 	parseNoteBody,
 	parseRoomReply,
@@ -119,7 +121,7 @@ describe('bigint-safe parsing', () => {
 	});
 
 	it('rejects bodies that are not a room view', () => {
-		expect(() => parseReadView('nope')).toThrow(/not JSON/);
+		expect(() => parseReadView('nope')).toThrow(/not a JSON object/);
 		expect(() => parseReadView('{"room":"x"}')).toThrow();
 	});
 });
