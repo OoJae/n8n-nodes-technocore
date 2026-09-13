@@ -3,9 +3,17 @@
  * real credential `authenticate` functions and n8n's real outbound HTTP client.
  * TEST seeds only; never production.
  */
-import { NodeApiError, type IDataObject } from 'n8n-workflow';
+import {
+	NodeApiError,
+	type ICredentialDataDecryptedObject,
+	type IDataObject,
+	type IHttpRequestOptions,
+	type IN8nHttpFullResponse,
+} from 'n8n-workflow';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { TechnocoreApi } from '../../credentials/TechnocoreApi.credentials';
+import { TechnocoreSigningKeyApi } from '../../credentials/TechnocoreSigningKeyApi.credentials';
 import { Technocore } from '../../nodes/Technocore/Technocore.node';
 import {
 	canonicalMessage,
@@ -19,6 +27,7 @@ import { sweep } from '../../nodes/Technocore/shared/sweep';
 import { KAT_ITEMS, TEST_SEEDS, cp } from '../fixtures/corpus.mjs';
 import { startTechnocore } from '../harness/local-server.mjs';
 import { hasCheckout } from '../harness/python.mjs';
+import { outboundHttp } from '../harness/real-n8n-http.mjs';
 import { makeExecuteFunctions, type CredentialData } from '../helpers/n8n-stubs';
 import { realRouter, type WireLog } from '../helpers/real-router';
 
@@ -220,6 +229,47 @@ describe('Post Signed against the local server', () => {
 			},
 		);
 		expect(allowed.log[0].status).toBe(200);
+	});
+});
+
+describe('credential tests against the local server', () => {
+	it('both credential test requests pass through authenticate and succeed', async () => {
+		const api = new TechnocoreApi();
+		const signing = new TechnocoreSigningKeyApi();
+		for (const [type, data] of [
+			[api, credentials.technocoreApi],
+			[signing, credentials.technocoreSigningKeyApi],
+		] as const) {
+			expect(type.test.request.method).toBe('GET');
+			const request: IHttpRequestOptions = {
+				baseURL: String(data?.origin),
+				url: String(type.test.request.url),
+				method: 'GET',
+				returnFullResponse: true,
+				ignoreHttpStatusErrors: true,
+				encoding: 'text',
+			};
+			const sent = await type.authenticate({ ...data } as ICredentialDataDecryptedObject, request);
+			const response = (await outboundHttp().request(sent)) as IN8nHttpFullResponse;
+			expect(response.statusCode, type.name).toBe(200);
+		}
+	});
+
+	it('a malformed seed fails the signing credential test before any request', async () => {
+		const signing = new TechnocoreSigningKeyApi();
+		await expect(
+			signing.authenticate(
+				{
+					...credentials.technocoreSigningKeyApi,
+					privateKeySeed: 'not a seed',
+				} as ICredentialDataDecryptedObject,
+				{
+					url: String(signing.test.request.url),
+					baseURL: server.origin,
+					method: 'GET',
+				},
+			),
+		).rejects.toThrow(/64 hexadecimal characters/);
 	});
 });
 
