@@ -107,9 +107,24 @@ export async function startTechnocore(options = {}) {
 	return { origin, root, port, stop };
 }
 
+/**
+ * fetch() that retries once when a pooled keep-alive connection was already closed by the
+ * server (uvicorn drops idle connections after 5 s; undici then reports ECONNRESET). Only
+ * for idempotent test reads and for writes that never reached the server.
+ */
+export async function fetchLocal(url, init) {
+	try {
+		return await fetch(url, init);
+	} catch (error) {
+		const code = error?.cause?.code;
+		if (code !== 'ECONNRESET' && code !== 'UND_ERR_SOCKET') throw error;
+		return await fetch(url, init);
+	}
+}
+
 /** Unsigned JSON post straight to the local server (test writer, not the node under test). */
 export async function postUnsigned(origin, room, from, text) {
-	const response = await fetch(`${origin}/r/${room}?format=json`, {
+	const response = await fetchLocal(`${origin}/r/${room}?format=json`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ from, text }),

@@ -26,6 +26,16 @@ export default defineConfig({
 					fileParallelism: false,
 				},
 			},
+			{
+				test: {
+					// Real n8n; opt-in (npm run test:e2e), needs N8N_E2E_NODE and N8N_E2E_N8N_BIN.
+					name: 'e2e',
+					include: ['tests/e2e/**/*.test.ts'],
+					testTimeout: 300_000,
+					hookTimeout: 300_000,
+					fileParallelism: false,
+				},
+			},
 		],
 	},
 });
