@@ -1,4 +1,4 @@
-// VENDORED from technocore-watch-core@ca4b04d2a79ba3d55a85b94c76f8131cbae3b839 src/protocol/sweep.ts - do not edit; run `npm run vendor`.
+// VENDORED from technocore-watch-core@3886b13b201797752d7274c3dcb184b21d276fde src/protocol/sweep.ts - do not edit; run `npm run vendor`.
 // The single-line sweep, mirrored from technocore-chat store.clean_text /
 // technocore_mcp.signing.sweep: every character in Unicode categories
 // Cc, Cf, Cs, Co, Zl, Zp becomes a space, then the ends are trimmed.

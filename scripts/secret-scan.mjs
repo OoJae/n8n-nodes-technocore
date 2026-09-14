@@ -2,8 +2,10 @@
 // Refuses any file that contains a run of 64+ hexadecimal characters (the shape of an
 // Ed25519 seed or any other 32-byte secret written as hex) unless the exact value is an
 // explicitly allow-listed, public TEST vector in .secret-scan-allow.json, and any file that
-// contains an email address (this repository publishes no contact address; a URL's
-// `user:password@host` part is not an email address and is not flagged).
+// contains an email address other than the one entry in ALLOWED_EMAILS: the user-approved
+// GitHub noreply author address (n8n's valid-author rule needs an author email). The match is
+// exact and case-sensitive; any other address, including another user's GitHub noreply address,
+// is refused. A URL's `user:password@host` part is not an email address and is not flagged.
 //
 //   node scripts/secret-scan.mjs            scan every tracked file (CI, tests)
 //   node scripts/secret-scan.mjs --staged   scan the staged content (pre-commit hook)
@@ -27,6 +29,18 @@ const HEX_RUN = /(?<![0-9a-fA-F])[0-9a-fA-F]{64,}(?![0-9a-fA-F])/g;
 // no alphabetic top-level domain and do not match.
 const EMAIL =
 	/(?<![A-Za-z0-9._%+-])(?<!:\/\/[^\s/@]*)[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}(?![A-Za-z0-9-])/g;
+
+/**
+ * The only email addresses the scan accepts, compared exactly against the whole matched address.
+ * Deliberately a constant in code, not a data file: widening it is a code change under review.
+ */
+export const ALLOWED_EMAILS = Object.freeze([
+	Object.freeze({
+		value: '73647277+OoJae@users.noreply.github.com',
+		label: 'GitHub noreply author (user-approved)',
+	}),
+]);
+const ALLOWED_EMAIL_VALUES = new Set(ALLOWED_EMAILS.map((entry) => entry.value));
 
 function git(args, root = ROOT) {
 	return execFileSync('git', args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
@@ -76,11 +90,16 @@ export function findHexSecretsInBuffer(buffer, allowed) {
 	return findInDecodings(buffer, (text) => findHexSecrets(text, allowed));
 }
 
-/** Email addresses in text, by line. The address itself is never returned. */
+/**
+ * Email addresses in text, by line, except an exact ALLOWED_EMAILS address. The address itself
+ * is never returned.
+ */
 export function findEmails(text) {
 	const findings = [];
 	text.split('\n').forEach((line, index) => {
-		for (const _match of line.matchAll(EMAIL)) findings.push({ line: index + 1, kind: 'email' });
+		for (const match of line.matchAll(EMAIL)) {
+			if (!ALLOWED_EMAIL_VALUES.has(match[0])) findings.push({ line: index + 1, kind: 'email' });
+		}
 	});
 	return findings;
 }
@@ -135,7 +154,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	const { files, problems } = scan({ staged: process.argv.includes('--staged') });
 	if (problems.length) {
 		console.error(
-			'secret-scan: refusing email addresses, and hex strings of 64+ characters that are not allow-listed test vectors:',
+			'secret-scan: refusing email addresses (other than the allowed GitHub noreply author), and hex strings of 64+ characters that are not allow-listed test vectors:',
 		);
 		for (const p of problems) {
 			const encoding = p.encoding ? `, ${p.encoding}` : '';
@@ -146,7 +165,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 			);
 		}
 		console.error(
-			`If a hex string is a public TEST vector, add it to ${ALLOW_FILE} with a label containing "test". Remove email addresses.`,
+			`If a hex string is a public TEST vector, add it to ${ALLOW_FILE} with a label containing "test". Remove email addresses; the only allowed one is ${ALLOWED_EMAILS.map((e) => e.label).join(', ')}.`,
 		);
 		process.exit(1);
 	}

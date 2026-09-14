@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { check } from '../../scripts/vendor-core.mjs';
 import {
+	ALLOWED_EMAILS,
 	findEmails,
 	findEmailsInBuffer,
 	findHexSecrets,
@@ -13,6 +14,10 @@ import { exampleWorkflows, readRepoFile, repoFileExists } from '../harness/repo-
 import { withTempGitRepo } from '../harness/temp-git-repo.mjs';
 
 const pkg = JSON.parse(readRepoFile('package.json'));
+
+// The one user-approved address: the GitHub noreply address of OoJae (n8n's valid-author rule
+// needs an author email). Every other address stays refused by the secret scan.
+const NOREPLY_AUTHOR = '73647277+OoJae@users.noreply.github.com';
 
 describe('package metadata (n8n community node requirements)', () => {
 	it('has no runtime dependencies, MIT license and the community keyword', () => {
@@ -29,10 +34,17 @@ describe('package metadata (n8n community node requirements)', () => {
 		]);
 	});
 
-	it('names the author and the GitHub repository without any email address', () => {
-		expect(pkg.author).toEqual({ name: 'OoJae', url: 'https://github.com/OoJae' });
-		expect(JSON.stringify(pkg)).not.toMatch(/"email"/);
-		expect(findEmails(readRepoFile('package.json'))).toEqual([]);
+	it('names the author with the GitHub profile and only the GitHub noreply email', () => {
+		expect(pkg.author).toEqual({
+			name: 'OoJae',
+			url: 'https://github.com/OoJae',
+			email: NOREPLY_AUTHOR,
+		});
+		expect(pkg.author.email).toBe(NOREPLY_AUTHOR);
+		const text = readRepoFile('package.json');
+		expect(text.match(/"email"/g)).toHaveLength(1);
+		expect(text.match(/@users\.noreply\.github\.com/g)).toHaveLength(1);
+		expect(findEmails(text)).toEqual([]);
 		expect(pkg.repository).toEqual({
 			type: 'git',
 			url: 'https://github.com/OoJae/n8n-nodes-technocore.git',
@@ -73,7 +85,7 @@ describe('example workflows', () => {
 });
 
 describe('secret scan', () => {
-	it('finds no email addresses and no unlisted 64-hex strings in tracked files', () => {
+	it('finds no email address other than the allowed noreply author and no unlisted 64-hex strings in tracked files', () => {
 		const { problems } = scan();
 		expect(problems).toEqual([]);
 	});
@@ -163,6 +175,42 @@ describe('email scan', () => {
 		]);
 	});
 
+	it('allows exactly the user-approved GitHub noreply author address and nothing else', () => {
+		expect(ALLOWED_EMAILS).toEqual([
+			{ value: NOREPLY_AUTHOR, label: 'GitHub noreply author (user-approved)' },
+		]);
+		expect(Object.isFrozen(ALLOWED_EMAILS)).toBe(true);
+		expect(Object.isFrozen(ALLOWED_EMAILS[0])).toBe(true);
+		for (const text of [
+			NOREPLY_AUTHOR,
+			`"email": "${NOREPLY_AUTHOR}"`,
+			`OoJae <${NOREPLY_AUTHOR}> (https://github.com/OoJae)`,
+			`mailto:${NOREPLY_AUTHOR}`,
+		]) {
+			expect(findEmails(text), text).toEqual([]);
+		}
+		expect(findEmailsInBuffer(Buffer.from(`author: ${NOREPLY_AUTHOR}\r\n`, 'utf16le'))).toEqual([]);
+		const noreply = 'users.noreply.github.com';
+		for (const text of [
+			at('12345678+someone', noreply), // another user's GitHub noreply address
+			at('73647277+someone', noreply), // same id, other user name
+			at('12345678+OoJae', noreply), // same user name, other id
+			at('OoJae', noreply), // old-style noreply without the id
+			at('73647277+oojae', noreply), // not the exact address (case differs)
+			at('73647277+OoJae', 'users.noreply.github.co'),
+			at('73647277+OoJae', 'noreply.github.com'),
+			at('73647277+OoJae', `${noreply}.example.com`),
+			at('x73647277+OoJae', noreply),
+			at('a.73647277+OoJae', noreply),
+			at('someone', 'example.com'),
+		]) {
+			expect(findEmails(`"email": "${text}"`), text).toHaveLength(1);
+		}
+		expect(findEmails(`${NOREPLY_AUTHOR}, ${at('someone', 'example.com')}`)).toEqual([
+			{ line: 1, kind: 'email' },
+		]);
+	});
+
 	it('finds email addresses in UTF-16 content and never reports the address', () => {
 		const le = Buffer.from(`author: ${at('someone', 'example.com')}\r\n`, 'utf16le');
 		expect(findEmailsInBuffer(le)).toEqual([{ line: 1, kind: 'email', encoding: 'utf-16le' }]);
@@ -185,6 +233,21 @@ describe('email scan', () => {
 			const staged = scan({ staged: true, root });
 			expect(staged.problems).toEqual([{ file: 'package.json', line: 1, kind: 'email' }]);
 			expect(JSON.stringify(staged.problems)).not.toContain(at('x', 'example.org'));
+		});
+	});
+
+	it('accepts a staged file with the noreply author and refuses another noreply address', () => {
+		withTempGitRepo(({ root, write, git }) => {
+			write('.secret-scan-allow.json', readRepoFile('.secret-scan-allow.json'));
+			write('package.json', `{ "author": { "name": "OoJae", "email": "${NOREPLY_AUTHOR}" } }\n`);
+			git('add', '.');
+			expect(scan({ staged: true, root }).problems).toEqual([]);
+			const other = at('12345678+someone', 'users.noreply.github.com');
+			write('package.json', `{ "author": { "name": "someone", "email": "${other}" } }\n`);
+			git('add', 'package.json');
+			const staged = scan({ staged: true, root });
+			expect(staged.problems).toEqual([{ file: 'package.json', line: 1, kind: 'email' }]);
+			expect(JSON.stringify(staged.problems)).not.toContain(other);
 		});
 	});
 });
