@@ -16,7 +16,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/OoJae/n8n-nodes-technocore.git"
+		"url": "git+https://github.com/OoJae/n8n-nodes-technocore.git"
 	},
 	"bugs": {
 		"url": "https://github.com/OoJae/n8n-nodes-technocore/issues"
@@ -41,7 +41,8 @@
 		"scan:local": "n8n-node build && node scripts/scan-local.mjs"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"!dist/tsconfig.tsbuildinfo"
 	],
 	"n8n": {
 		"n8nNodesApiVersion": 1,

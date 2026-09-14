@@ -25,7 +25,8 @@ describe('package metadata (n8n community node requirements)', () => {
 		expect(pkg.license).toBe('MIT');
 		expect(pkg.name).toBe('n8n-nodes-technocore');
 		expect(pkg.keywords).toContain('n8n-community-node-package');
-		expect(pkg.files).toEqual(['dist']);
+		// dist only, without the TypeScript incremental build cache (half the unpacked size, no use to n8n).
+		expect(pkg.files).toEqual(['dist', '!dist/tsconfig.tsbuildinfo']);
 		expect(pkg.peerDependencies).toEqual({ 'n8n-workflow': '*' });
 		expect(pkg.n8n.strict).toBe(true);
 		expect(pkg.n8n.nodes).toEqual([
@@ -47,7 +48,7 @@ describe('package metadata (n8n community node requirements)', () => {
 		expect(findEmails(text)).toEqual([]);
 		expect(pkg.repository).toEqual({
 			type: 'git',
-			url: 'https://github.com/OoJae/n8n-nodes-technocore.git',
+			url: 'git+https://github.com/OoJae/n8n-nodes-technocore.git',
 		});
 		expect(pkg.homepage).toBe('https://github.com/OoJae/n8n-nodes-technocore#readme');
 		expect(pkg.bugs).toEqual({ url: 'https://github.com/OoJae/n8n-nodes-technocore/issues' });

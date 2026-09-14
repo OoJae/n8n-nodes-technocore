@@ -14,10 +14,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 'lts/*'
           cache: 'npm'
@@ -47,25 +47,25 @@ jobs:
     # Cross-checks against the Python signer and a disposable local Technocore server.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: n8n-nodes-technocore
 
       - name: Check out technocore-chat v0.13.0
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: flop-labs/technocore-chat
           ref: 20a4457b89ba11254f4aa48217b066884a148d98
           path: .cache/technocore-chat
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
 
       - name: Sync the server environment
         working-directory: .cache/technocore-chat
         run: uv sync --frozen
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 'lts/*'
           cache: 'npm'
@@ -85,25 +85,25 @@ jobs:
     env:
       N8N_VERSION: '2.38.7'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           path: n8n-nodes-technocore
 
       - name: Check out technocore-chat v0.13.0
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: flop-labs/technocore-chat
           ref: 20a4457b89ba11254f4aa48217b066884a148d98
           path: .cache/technocore-chat
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
 
       - name: Sync the server environment
         working-directory: .cache/technocore-chat
         run: uv sync --frozen
 
       - name: Set up Node.js 24 (n8n 2.x requires it)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'

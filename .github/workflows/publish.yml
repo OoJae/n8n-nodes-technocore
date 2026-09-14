@@ -31,9 +31,12 @@
 #   Trusted publishing needs npm CLI 11.5.1 or later; the "Ensure npm >= 11.5.1"
 #   step below guarantees it (Node 24 plus an in-place npm upgrade if needed).
 #   The package must already exist on npm before a trusted publisher can be
-#   added, so the very first version is published by hand (see README, Releasing).
+#   added, so the very first version (0.1.0) is published by this workflow
+#   with Option B, keeping its provenance; then switch to Option A and delete
+#   the secret (see README, Releasing). Never publish by hand: a version
+#   without provenance cannot become a verified community node.
 #
-# Option B — npm Automation Token (fallback):
+# Option B — npm granular access token (first release only, or fallback):
 #   1. On npmjs.com: Access Tokens → Generate New Token → Granular Access Token.
 #      Scope it to this package with "Read and write" publish permission.
 #   2. In GitHub: Settings → Secrets and variables → Actions → New secret.
@@ -79,10 +82,10 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
