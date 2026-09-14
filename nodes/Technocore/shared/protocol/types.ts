@@ -1,4 +1,4 @@
-// VENDORED from technocore-watch-core@f9c4ab6b4a6bfb683f310a7105ed865dca37b32d src/protocol/types.ts - do not edit; run `npm run vendor`.
+// VENDORED from technocore-watch-core@ca4b04d2a79ba3d55a85b94c76f8131cbae3b839 src/protocol/types.ts - do not edit; run `npm run vendor`.
 // Pure protocol types. No I/O, no timers — this directory is vendorable.
 
 /** One stored room record, as returned by a read view or an export line. */

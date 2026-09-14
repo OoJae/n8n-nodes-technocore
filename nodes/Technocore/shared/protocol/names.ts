@@ -1,4 +1,4 @@
-// VENDORED from technocore-watch-core@f9c4ab6b4a6bfb683f310a7105ed865dca37b32d src/protocol/names.ts - do not edit; run `npm run vendor`.
+// VENDORED from technocore-watch-core@ca4b04d2a79ba3d55a85b94c76f8131cbae3b839 src/protocol/names.ts - do not edit; run `npm run vendor`.
 // Room/nick/namespace names. Mirrors technocore-chat src/store.py NAME_RE and room_classes.
 
 export const ROOM_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,47}$/;
