@@ -57,7 +57,7 @@ Known gaps:
 - **Credential test button.** Both credential test requests are run through `authenticate` and succeed against the local server in the integration tests, but the n8n UI/REST credential-test flow was not clicked through.
 - **`npx @n8n/scan-community-package`** only works on a published package, so only its lint legs have run (`npm run scan:local`).
 - **Protocol vendoring.** `nodes/Technocore/shared/protocol/` holds `names.ts`, `sweep.ts` and `types.ts` vendored from `technocore-watch-core` at commit `f9c4ab6` (see `VENDOR.json`; `npm run vendor:check` confirms the core's current HEAD has not changed them). `parse.ts`, `reconcile.ts` and `render.ts` are not vendored, for the reasons recorded in `VENDOR.json`. Re-run `npm run vendor` when the core package is released. The signing sweep deliberately does not use the vendored `sweepText` (see [Signing key credential](#signing-key-credential)).
-- The author email in `package.json` is required by the n8n lint rules; change it before publishing if you prefer a different address.
+- **No author email, so n8n's `valid-author` lint rule fails.** `package.json` names the author as `OoJae` with the GitHub profile URL and deliberately carries no email address (the secret scan refuses any email address in the repository). n8n's `@n8n/community-nodes/valid-author` rule requires a non-empty `author.email`, and the same rule runs in `npm run lint`, in `n8n-node release` (so in the publish workflow), and in the n8n verification scanner (`npm run scan:local`, `npx @n8n/scan-community-package`). Those fail on that one rule until an address is added to `author`.
 
 ## Installation
 
@@ -214,7 +214,7 @@ Other scripts:
 | `npm run vendor` / `npm run vendor:check` | Copy `technocore-watch-core/src/protocol` from that repo's git HEAD into `nodes/Technocore/shared/protocol/` and record integrity hashes in `VENDOR.json` / verify them. |
 | `cd <technocore-chat> && uv run python "<this repo>/scripts/gen-sweep-table.py" > "<this repo>/nodes/Technocore/shared/sweep-table.ts"` | Regenerate the Unicode table used by the signing sweep, with the server's own Python (see the file header). |
 | `node scripts/gen-fixtures.mjs` | Regenerate `tests/fixtures/kat.json` from the Python signer. |
-| `npm run secret-scan` | Fail on any tracked 64+ character hex string that is not an allow-listed test vector (`.secret-scan-allow.json`). Also installed as a pre-commit hook: `git config core.hooksPath .githooks`. |
+| `npm run secret-scan` | Fail on any tracked 64+ character hex string that is not an allow-listed test vector (`.secret-scan-allow.json`), and on any email address. Also installed as a pre-commit hook: `git config core.hooksPath .githooks`. |
 
 Test tooling that needs `child_process` or `process` lives in `tests/harness/*.mjs`, because the community-node lint rules forbid those globals in TypeScript; none of it ships (`files: ["dist"]`).
 

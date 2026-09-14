@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Refuses any file that contains a run of 64+ hexadecimal characters (the shape of an
 // Ed25519 seed or any other 32-byte secret written as hex) unless the exact value is an
-// explicitly allow-listed, public TEST vector in .secret-scan-allow.json.
+// explicitly allow-listed, public TEST vector in .secret-scan-allow.json, and any file that
+// contains an email address (this repository publishes no contact address; a URL's
+// `user:password@host` part is not an email address and is not flagged).
 //
 //   node scripts/secret-scan.mjs            scan every tracked file (CI, tests)
 //   node scripts/secret-scan.mjs --staged   scan the staged content (pre-commit hook)
@@ -10,7 +12,8 @@
 // data), and, when it holds NUL bytes, also as UTF-16 in both byte orders, so a seed saved
 // by a tool that writes UTF-16 (a PowerShell redirect, an editor's "Unicode") is found too.
 //
-// Never prints a matched value: only the file, line and a short prefix.
+// Never prints a matched value: only the file, line and a short prefix (hex) or nothing
+// (email).
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -19,6 +22,11 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ALLOW_FILE = '.secret-scan-allow.json';
 const HEX_RUN = /(?<![0-9a-fA-F])[0-9a-fA-F]{64,}(?![0-9a-fA-F])/g;
+// An address (local part, "@", dotted domain), not preceded by another local-part character and not the userinfo of a
+// `scheme://user:password@host` URL. Package specs such as `n8n@2.38.7` or `npm@latest` have
+// no alphabetic top-level domain and do not match.
+const EMAIL =
+	/(?<![A-Za-z0-9._%+-])(?<!:\/\/[^\s/@]*)[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}(?![A-Za-z0-9-])/g;
 
 function git(args, root = ROOT) {
 	return execFileSync('git', args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
@@ -65,6 +73,24 @@ export function findHexSecrets(text, allowed) {
  * offset 1) are only needed, and only tried, when the content has one.
  */
 export function findHexSecretsInBuffer(buffer, allowed) {
+	return findInDecodings(buffer, (text) => findHexSecrets(text, allowed));
+}
+
+/** Email addresses in text, by line. The address itself is never returned. */
+export function findEmails(text) {
+	const findings = [];
+	text.split('\n').forEach((line, index) => {
+		for (const _match of line.matchAll(EMAIL)) findings.push({ line: index + 1, kind: 'email' });
+	});
+	return findings;
+}
+
+/** Email addresses in raw file content, decoded the same ways as findHexSecretsInBuffer. */
+export function findEmailsInBuffer(buffer) {
+	return findInDecodings(buffer, findEmails);
+}
+
+function findInDecodings(buffer, find) {
 	const texts = [{ encoding: 'utf-8', text: buffer.toString('utf8') }];
 	if (buffer.includes(0)) {
 		texts.push({ encoding: 'utf-16le', text: buffer.toString('utf16le') });
@@ -72,7 +98,7 @@ export function findHexSecretsInBuffer(buffer, allowed) {
 	}
 	const findings = [];
 	for (const { encoding, text } of texts) {
-		for (const finding of findHexSecrets(text, allowed)) {
+		for (const finding of find(text)) {
 			findings.push(encoding === 'utf-8' ? finding : { ...finding, encoding });
 		}
 	}
@@ -98,6 +124,9 @@ export function scan({ staged = false, root = ROOT } = {}) {
 		for (const finding of findHexSecretsInBuffer(content, allowed)) {
 			problems.push({ file, ...finding });
 		}
+		for (const finding of findEmailsInBuffer(content)) {
+			problems.push({ file, ...finding });
+		}
 	}
 	return { files: files.length, problems };
 }
@@ -106,14 +135,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 	const { files, problems } = scan({ staged: process.argv.includes('--staged') });
 	if (problems.length) {
 		console.error(
-			'secret-scan: refusing hex strings of 64+ characters that are not allow-listed test vectors:',
+			'secret-scan: refusing email addresses, and hex strings of 64+ characters that are not allow-listed test vectors:',
 		);
-		for (const p of problems)
+		for (const p of problems) {
+			const encoding = p.encoding ? `, ${p.encoding}` : '';
 			console.error(
-				`  ${p.file}:${p.line}  ${p.prefix} (${p.length} hex chars${p.encoding ? `, ${p.encoding}` : ''})`,
+				p.kind === 'email'
+					? `  ${p.file}:${p.line}  email address${encoding ? ` (${p.encoding})` : ''}`
+					: `  ${p.file}:${p.line}  ${p.prefix} (${p.length} hex chars${encoding})`,
 			);
+		}
 		console.error(
-			`If one is a public TEST vector, add it to ${ALLOW_FILE} with a label containing "test".`,
+			`If a hex string is a public TEST vector, add it to ${ALLOW_FILE} with a label containing "test". Remove email addresses.`,
 		);
 		process.exit(1);
 	}

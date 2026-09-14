@@ -11,11 +11,14 @@
 	],
 	"author": {
 		"name": "OoJae",
-		"email": "73647277+OoJae@users.noreply.github.com"
+		"url": "https://github.com/OoJae"
 	},
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/OoJae/n8n-nodes-technocore.git"
+	},
+	"bugs": {
+		"url": "https://github.com/OoJae/n8n-nodes-technocore/issues"
 	},
 	"scripts": {
 		"build": "n8n-node build",

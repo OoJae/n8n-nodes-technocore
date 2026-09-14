@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { check } from '../../scripts/vendor-core.mjs';
 import {
+	findEmails,
+	findEmailsInBuffer,
 	findHexSecrets,
 	findHexSecretsInBuffer,
 	loadAllowList,
@@ -25,6 +27,18 @@ describe('package metadata (n8n community node requirements)', () => {
 			'dist/nodes/Technocore/Technocore.node.js',
 			'dist/nodes/TechnocoreTrigger/TechnocoreTrigger.node.js',
 		]);
+	});
+
+	it('names the author and the GitHub repository without any email address', () => {
+		expect(pkg.author).toEqual({ name: 'OoJae', url: 'https://github.com/OoJae' });
+		expect(JSON.stringify(pkg)).not.toMatch(/"email"/);
+		expect(findEmails(readRepoFile('package.json'))).toEqual([]);
+		expect(pkg.repository).toEqual({
+			type: 'git',
+			url: 'https://github.com/OoJae/n8n-nodes-technocore.git',
+		});
+		expect(pkg.homepage).toBe('https://github.com/OoJae/n8n-nodes-technocore#readme');
+		expect(pkg.bugs).toEqual({ url: 'https://github.com/OoJae/n8n-nodes-technocore/issues' });
 	});
 
 	it('ships a LICENSE and a README that states it is unofficial', () => {
@@ -59,7 +73,7 @@ describe('example workflows', () => {
 });
 
 describe('secret scan', () => {
-	it('finds no unlisted 64-hex strings in tracked files', () => {
+	it('finds no email addresses and no unlisted 64-hex strings in tracked files', () => {
 		const { problems } = scan();
 		expect(problems).toEqual([]);
 	});
@@ -120,6 +134,57 @@ describe('secret scan', () => {
 			expect(staged.problems[0]).toMatchObject({ file: 'notes.txt', line: 1, length: 64 });
 			expect(JSON.stringify(staged.problems)).not.toContain('cd'.repeat(32));
 			expect(scan({ root }).problems).toHaveLength(1);
+		});
+	});
+});
+
+describe('email scan', () => {
+	// Addresses are assembled at run time so this file holds none itself.
+	const at = (local: string, domain: string) => [local, domain].join('@');
+
+	it('flags email addresses but not URL credentials or package specs', () => {
+		for (const text of [
+			`"email": "${at('someone', 'example.com')}"`,
+			`mailto:${at('first.last+tag', 'mail.example.co.uk')}`,
+			`Name <${at('x_y-z', 'sub.example.org')}> (https://example.org)`,
+		]) {
+			expect(findEmails(text), text).toHaveLength(1);
+		}
+		for (const text of [
+			"{ origin: 'https://user:pw@technocore.test' }",
+			'ssh://git@github.com/OoJae/n8n-nodes-technocore.git',
+			'npm install n8n@2.38.7 npm@latest @n8n/node-cli@0.47.2',
+			'user@localhost',
+		]) {
+			expect(findEmails(text), text).toEqual([]);
+		}
+		expect(findEmails(`a\nb\ncontact: ${at('someone', 'example.com')}`)).toEqual([
+			{ line: 3, kind: 'email' },
+		]);
+	});
+
+	it('finds email addresses in UTF-16 content and never reports the address', () => {
+		const le = Buffer.from(`author: ${at('someone', 'example.com')}\r\n`, 'utf16le');
+		expect(findEmailsInBuffer(le)).toEqual([{ line: 1, kind: 'email', encoding: 'utf-16le' }]);
+		expect(findEmailsInBuffer(Buffer.from(le).swap16())).toEqual([
+			{ line: 1, kind: 'email', encoding: 'utf-16be' },
+		]);
+	});
+
+	it('refuses a staged file holding an email address (the pre-commit path)', () => {
+		withTempGitRepo(({ root, write, git }) => {
+			write('.secret-scan-allow.json', readRepoFile('.secret-scan-allow.json'));
+			write('package.json', '{ "author": { "name": "x", "url": "https://example.org" } }\n');
+			git('add', '.');
+			expect(scan({ staged: true, root }).problems).toEqual([]);
+			write(
+				'package.json',
+				`{ "author": { "name": "x", "email": "${at('x', 'example.org')}" } }\n`,
+			);
+			git('add', 'package.json');
+			const staged = scan({ staged: true, root });
+			expect(staged.problems).toEqual([{ file: 'package.json', line: 1, kind: 'email' }]);
+			expect(JSON.stringify(staged.problems)).not.toContain(at('x', 'example.org'));
 		});
 	});
 });
