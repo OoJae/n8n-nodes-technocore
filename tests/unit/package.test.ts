@@ -189,6 +189,34 @@ describe('email scan', () => {
 	});
 });
 
+describe('publish workflow', () => {
+	const workflow = readRepoFile('.github/workflows/publish.yml');
+
+	it('publishes with provenance through trusted publishing on npm >= 11.5.1', () => {
+		expect(workflow).toMatch(/^\s+id-token: write$/m);
+		expect(workflow).toMatch(/^\s+node-version: '24'$/m);
+		expect(workflow).not.toMatch(/node-version: 'lts\/\*'/);
+		expect(workflow).toContain('at_least "$(npm --version)" 11.5.1 || {');
+		expect(workflow).toContain('npm install -g npm@^11.5.1');
+		expect(workflow).toMatch(/^\s+NPM_CONFIG_PROVENANCE: 'true'$/m);
+		expect(workflow).toMatch(/^\s+npm run release$/m);
+		expect(workflow.indexOf('- name: Ensure npm >= 11.5.1')).toBeGreaterThan(0);
+		expect(workflow.indexOf('- name: Ensure npm >= 11.5.1')).toBeLessThan(
+			workflow.search(/^\s+npm run release$/m),
+		);
+	});
+
+	it('keeps the *.*.* tag pattern, refuses tags that are not the package version, and names OoJae', () => {
+		expect(workflow).toMatch(/^\s+tags:\n(?:\s+#.*\n)*\s+- '\*\.\*\.\*'$/m);
+		expect(workflow).toContain('if [ "$GITHUB_REF_NAME" != "$version" ]; then');
+		expect(workflow).not.toMatch(/<your-/);
+		expect(workflow).toMatch(/Organization or user: OoJae\n#\s+Repository:\s+n8n-nodes-technocore/);
+		const releasing = readRepoFile('README.md').split('\n## Releasing\n')[1]?.split('\n## ')[0];
+		expect(releasing).toBeDefined();
+		expect(releasing).toContain('`*.*.*`');
+	});
+});
+
 describe('README commands', () => {
 	it('runs every script with the interpreter its file is written for', () => {
 		const readme = readRepoFile('README.md');

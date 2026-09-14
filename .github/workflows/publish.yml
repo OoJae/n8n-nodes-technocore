@@ -20,15 +20,18 @@
 # ─── ONE-TIME SETUP ────────────────────────────────────────────────────────────
 #
 # Option A — OIDC Trusted Publishing (recommended, no long-lived secrets):
-#   1. Log in to npmjs.com and open your package's settings.
-#   2. Under "Publish access" → "Trusted Publishers", click "Add a publisher".
-#   3. Select GitHub Actions and fill in:
-#        Repository owner: <your-github-username-or-org>
-#        Repository name:  <your-repo-name>
-#        Workflow name:    publish.yml
-#        Environment:      (leave blank unless you use GitHub Environments)
-#   4. Leave the NPM_TOKEN secret unset in this repository. GitHub's OIDC
-#      token is used instead — no secret ever touches your repo settings.
+#   1. Log in to npmjs.com and open the n8n-nodes-technocore package settings.
+#   2. Under "Trusted Publisher", choose GitHub Actions and fill in:
+#        Organization or user: OoJae
+#        Repository:           n8n-nodes-technocore
+#        Workflow filename:    publish.yml
+#        Environment:          (leave blank; this workflow uses none)
+#   3. Leave the NPM_TOKEN secret unset in this repository. GitHub's OIDC
+#      token is used instead — no secret ever touches the repo settings.
+#   Trusted publishing needs npm CLI 11.5.1 or later; the "Ensure npm >= 11.5.1"
+#   step below guarantees it (Node 24 plus an in-place npm upgrade if needed).
+#   The package must already exist on npm before a trusted publisher can be
+#   added, so the very first version is published by hand (see README, Releasing).
 #
 # Option B — npm Automation Token (fallback):
 #   1. On npmjs.com: Access Tokens → Generate New Token → Granular Access Token.
@@ -41,9 +44,11 @@
 #
 # ─── TAG CONVENTION ────────────────────────────────────────────────────────────
 #
-# This workflow triggers on tags matching "*.*.*" (e.g. 0.2.0).
-# If you prefer tags with a "v" prefix (e.g. v0.2.0), change the filter to:
-#   tags: ['v*.*.*']
+# This workflow triggers on tags matching "*.*.*" with no "v" prefix (e.g. 0.2.0),
+# the format `npm run release` (release-it) creates for this package. The
+# "Check the tag matches package.json" step refuses any tag that is not exactly
+# the package.json version, so a stray tag such as v0.2.0 or 0.2.0-typo cannot
+# publish. The convention is documented in README.md (Releasing).
 #
 # ─── RELEASE PROCESS ───────────────────────────────────────────────────────────
 #
@@ -59,8 +64,7 @@ name: Publish
 on:
   push:
     tags:
-      # Matches 0.1.0, 1.2.3, 2.0.0-rc.1, etc.
-      # See "TAG CONVENTION" above if you prefer tags with a "v" prefix.
+      # Matches 0.1.0, 1.2.3, 2.0.0-rc.1, etc. (no "v" prefix; see TAG CONVENTION above).
       - '*.*.*'
 
 jobs:
@@ -77,14 +81,39 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: '24'
           cache: 'npm'
 
+      - name: Ensure npm >= 11.5.1 (required for trusted publishing)
+        run: |
+          at_least() { node -e 'const [a, b] = process.argv.slice(1).map((v) => v.split(".").map(Number)); for (let i = 0; i < 3; i++) { if (a[i] !== b[i]) process.exit(a[i] > b[i] ? 0 : 1); }' "$1" "$2"; }
+          if ! at_least "$(npm --version)" 11.5.1; then
+            npm install -g npm@^11.5.1
+          fi
+          at_least "$(npm --version)" 11.5.1 || { echo "npm $(npm --version) is older than 11.5.1"; exit 1; }
+          echo "node $(node --version), npm $(npm --version)"
+
+      - name: Check the tag matches package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
       - name: Install dependencies
-        run: npm ci
+        # No dependency lifecycle scripts in a job that can mint an OIDC token.
+        run: npm ci --ignore-scripts
+
+      - name: Verify (secret scan, vendored protocol, type-check, unit tests)
+        run: |
+          npm run secret-scan
+          npm run vendor:check
+          npm run typecheck
+          npm run test:unit
 
       - name: Release
         # Publishes to npm with a provenance attestation (requires id-token: write above).
@@ -99,3 +128,6 @@ jobs:
           npm run release
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # `n8n-node release` already sets this when publishing; kept explicit so the
+          # provenance attestation cannot be dropped by a CLI change.
+          NPM_CONFIG_PROVENANCE: 'true'

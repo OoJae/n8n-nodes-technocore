@@ -23,6 +23,7 @@ Tested against technocore-chat v0.13.0 (commit `20a4457`) on a local server. MIT
 - [Security notes](#security-notes)
 - [Example workflows](#example-workflows)
 - [Development](#development)
+- [Releasing](#releasing)
 - [Compatibility](#compatibility)
 
 ## Status
@@ -217,6 +218,18 @@ Other scripts:
 | `npm run secret-scan` | Fail on any tracked 64+ character hex string that is not an allow-listed test vector (`.secret-scan-allow.json`), and on any email address. Also installed as a pre-commit hook: `git config core.hooksPath .githooks`. |
 
 Test tooling that needs `child_process` or `process` lives in `tests/harness/*.mjs`, because the community-node lint rules forbid those globals in TypeScript; none of it ships (`files: ["dist"]`).
+
+## Releasing
+
+Source: [github.com/OoJae/n8n-nodes-technocore](https://github.com/OoJae/n8n-nodes-technocore) ([issues](https://github.com/OoJae/n8n-nodes-technocore/issues)).
+
+Releases are published to npm by GitHub Actions (`.github/workflows/publish.yml`) with an npm provenance attestation, which n8n requires for verified community nodes.
+
+- **Tag pattern: `*.*.*`, no `v` prefix.** The workflow runs on a pushed tag such as `0.2.0` or `1.0.0-rc.1`, the format `npm run release` (release-it) creates. It refuses to publish when the tag is not exactly the `version` in `package.json`, so `v0.2.0` (which also matches `*.*.*`) never publishes.
+- **Cutting a release:** on a clean, pushed `main`, run `npm run release`. It lints, builds, bumps the version, updates the changelog, commits, tags and pushes; the tag push starts the publish workflow.
+- **The publish job** runs on Node 24 and makes sure npm is 11.5.1 or later (upgrading npm in place if the runner's is older), because npm trusted publishing needs it. It installs with `npm ci --ignore-scripts`, runs the secret scan, `vendor:check`, the type-check and the unit tests, then `npm run release`, which in GitHub Actions runs lint and build and `npm publish` with `NPM_CONFIG_PROVENANCE=true`.
+- **Authentication:** npm trusted publishing (OIDC). On npmjs.com, in the package settings under Trusted Publisher, choose GitHub Actions with user `OoJae`, repository `n8n-nodes-technocore`, workflow `publish.yml`, no environment. No `NPM_TOKEN` secret is needed; if one is set, the workflow uses it instead.
+- **First version:** a trusted publisher can only be added to a package that already exists on npm, so the first version is published by hand, without provenance. `npm publish` is blocked by the `prepublishOnly` guard (`n8n-node prerelease`) unless `RELEASE_MODE` is set, and `files` ships only `dist`, so build first: `npm run build && RELEASE_MODE=true npm publish --access public`.
 
 ## Compatibility
 
