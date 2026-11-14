@@ -28,7 +28,7 @@ Tested against technocore-chat v0.13.0 (commit `20a4457`) on a local server. MIT
 
 ## Status
 
-Version 0.1.0, not published to npm. Verified on the build machine (macOS, Apple M5, Node 26 for the build and tests, n8n 2.38.7 on Node 24.21.0 for the end-to-end run; n8n-workflow 2.38.1, @n8n/node-cli 0.47.2, technocore-chat v0.13.0 at `20a4457`):
+Version 0.1.0, published to npm from GitHub Actions with npm provenance. Verified on the build machine (macOS, Apple M5, Node 26 for the build and tests, n8n 2.38.7 on Node 24.21.0 for the end-to-end run; n8n-workflow 2.38.1, @n8n/node-cli 0.47.2, technocore-chat v0.13.0 at `20a4457`). Every row was re-run on 2026-11-14 with the same result, and the three test projects and the end-to-end run also pass with the local server at upstream `main` `3cd868e` (0.14.5):
 
 | Check | Result |
 |---|---|
@@ -38,7 +38,7 @@ Version 0.1.0, not published to npm. Verified on the build machine (macOS, Apple
 | Unit tests (`npm run test:unit`): credentials, signing (per-room nonce counters, refused far-ahead nonces), signature verification of received records, parsing, node operations (409 current value), `poll()` with a stubbed `IPollFunctions` for every trigger scenario (time-bounded export resumed, activation on expired/reaped rooms, same-generation sequence restart, quiet-poll check), a randomized `assemble()` invariant test over report / suppress / recreated modes and size / time budgets, package rules (author `OoJae` with the GitHub profile URL and the GitHub noreply email, GitHub URLs, publish workflow and release docs), secret scan (hex and email addresses; UTF-8, UTF-16, binary; only the one allowed noreply author address passes), vendor integrity | 152 pass |
 | Cross-check (`npm run test:crosscheck`) against the Python signer (`uv run scripts/sign.py --seed <TEST seed> did\|say\|note`) and the server's own sweep (`store.clean_text`), including a regenerated Unicode table | 9 pass |
 | Integration (`npm run test:integration`) against a disposable local server through n8n's real outbound HTTP client (`@n8n/backend-network`): signed post accepted (200) and re-verified, stale-nonce retry and refusal of a nanosecond-scale nonce, mailbox, notes (8192-character 409 value rebased with Only If Unchanged), both credential tests, AI-tool refusal, trigger backfill, export resumed after the poll time budget, quiet-poll check, activation on an expired `e-` room and on a reaped room, Start From = retained without backfill, recreation, same-generation sequence restart (fresh store on the same origin), 429 | 26 pass |
-| End to end in a real n8n (`npm run test:e2e`): the packed package installed as a community package, credentials stored encrypted by n8n, workflows run by n8n's engine and poll scheduler, local server | 8 pass (last run before the author email was added to `package.json`; not re-run since, no n8n host on the build machine now) |
+| End to end in a real n8n (`npm run test:e2e`): the packed package installed as a community package, credentials stored encrypted by n8n, workflows run by n8n's engine and poll scheduler, local server | 8 pass (re-run on 2026-11-14 with the released `package.json`) |
 
 The end-to-end run checks, inside n8n 2.38.7:
 
@@ -61,7 +61,7 @@ Known gaps:
 
 ## Installation
 
-Once published: **Settings → Community Nodes → Install**, package name `n8n-nodes-technocore`. See the [n8n community nodes guide](https://docs.n8n.io/integrations/community-nodes/installation/).
+In n8n: **Settings → Community Nodes → Install**, package name `n8n-nodes-technocore`. See the [n8n community nodes guide](https://docs.n8n.io/integrations/community-nodes/installation/).
 
 ## Credentials
 
@@ -227,15 +227,15 @@ Releases are published to npm by GitHub Actions (`.github/workflows/publish.yml`
 - **Tag pattern: `*.*.*`, no `v` prefix.** The workflow runs on a pushed tag such as `0.2.0` or `1.0.0-rc.1`, the format `npm run release` (release-it) creates. It refuses to publish when the tag is not exactly the `version` in `package.json`, so `v0.2.0` (which also matches `*.*.*`) never publishes.
 - **Cutting a release:** on a clean, pushed `main`, run `npm run release`. It lints, builds, bumps the version, updates the changelog, commits, tags and pushes; the tag push starts the publish workflow.
 - **The publish job** runs on Node 24 and makes sure npm is 11.5.1 or later (upgrading npm in place if the runner's is older), because npm trusted publishing needs it. It installs with `npm ci --ignore-scripts`, runs the secret scan, `vendor:check`, the type-check and the unit tests, then `npm run release`, which in GitHub Actions runs lint and build and `npm publish` with `NPM_CONFIG_PROVENANCE=true`.
-- **Authentication:** npm trusted publishing (OIDC). On npmjs.com, in the package settings under Trusted Publisher, choose GitHub Actions with user `OoJae`, repository `n8n-nodes-technocore`, workflow `publish.yml`, no environment. No `NPM_TOKEN` secret is needed then; if one is set, the workflow also writes it to the npm config as a token fallback.
-- **First version (0.1.0):** a trusted publisher can only be added to a package that already exists on npm, so the first version is published by the same workflow with a token: create a short-lived granular access token on npmjs.com (read and write for this package), store it as the `NPM_TOKEN` repository secret, and push the `0.1.0` tag. It still runs in GitHub Actions with `NPM_CONFIG_PROVENANCE=true`, so 0.1.0 carries provenance. Then add the trusted publisher as above and delete the secret and the token.
+- **Authentication:** npm trusted publishing (OIDC). On npmjs.com, in the package settings under Trusted publishing, choose GitHub Actions with user `OoJae`, repository `n8n-nodes-technocore`, workflow `publish.yml`, no environment, and also allow `npm publish`: configurations created since 3 September 2026 allow only `npm stage publish` unless you do, and this workflow runs `npm publish`. Add it just before the release it is for: npm expires a new configuration that has not completed a publish within 2 days. No `NPM_TOKEN` secret is needed then; if one is set, the workflow also writes it to the npm config as a token fallback.
+- **First version (0.1.0):** a trusted publisher can only be added to a package that already exists on npm, so the first version is published by the same workflow with a token. Create a short-lived granular access token on npmjs.com with *Read and write (publish and stage)* on *All Packages* (a package that does not exist yet cannot be selected) and *Bypass two-factor authentication* ticked (a CI job cannot answer a 2FA prompt), store it as the `NPM_TOKEN` repository secret, and push the `0.1.0` tag. A *stage only* token does not work here: `npm publish` refuses it with `E_STAGE_REQUIRED`. The release still runs in GitHub Actions with `NPM_CONFIG_PROVENANCE=true`, so 0.1.0 carries provenance. Then delete the secret and the token; npm plans to stop direct publishing with bypass-2FA tokens in January 2027, so this route is for the first version only.
 - **Do not publish a version by hand.** `@n8n/node-cli` warns that packages published without GitHub Actions provenance cannot become verified community nodes, and n8n requires verified community nodes to be published through GitHub Actions with provenance (from May 1 2026). If a version ever goes out by hand (`npm run build && RELEASE_MODE=true npm publish --access public`, which gets past the `prepublishOnly` guard `n8n-node prerelease`), release the next version through the workflow before submitting the package for verification.
 - **README on npm:** the README published with a version cannot change afterwards, so update Status and Installation in the release commit, before the tag.
 
 ## Compatibility
 
 - n8n with `n8nNodesApiVersion` 1 and a Node.js that n8n supports. Tested end to end with self-hosted n8n 2.38.7 on Node 24.21.0. `restrictToSupportedNodes` needs an n8n release that supports it; older releases ignore the flag. The credential still refuses to sign anything but a Technocore room post, but on such a release other nodes (for example HTTP Request) could use it to sign room posts, so run a release that enforces it.
-- technocore-chat 0.13.0 read/write contract (`generation` in read views, `/r/<room>/export`).
+- technocore-chat 0.13.0 read/write contract (`generation` in read views, `/r/<room>/export`). The unit, cross-check, integration and end-to-end tests also pass against upstream `main` at `3cd868e` (0.14.5, the version technocore.chat reports), re-run on 2026-11-14.
 
 ## License
 

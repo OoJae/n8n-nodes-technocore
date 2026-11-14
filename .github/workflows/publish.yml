@@ -21,11 +21,15 @@
 #
 # Option A — OIDC Trusted Publishing (recommended, no long-lived secrets):
 #   1. Log in to npmjs.com and open the n8n-nodes-technocore package settings.
-#   2. Under "Trusted Publisher", choose GitHub Actions and fill in:
+#   2. Under "Trusted publishing", choose GitHub Actions and fill in:
 #        Organization or user: OoJae
 #        Repository:           n8n-nodes-technocore
 #        Workflow filename:    publish.yml
 #        Environment:          (leave blank; this workflow uses none)
+#        Allowed actions:      also allow `npm publish` (since Sep 3 2026 a new
+#                              configuration allows only `npm stage publish`)
+#      Do this just before the release it is for: npm expires a new
+#      configuration that has not completed a publish within 2 days.
 #   3. Leave the NPM_TOKEN secret unset in this repository. GitHub's OIDC
 #      token is used instead — no secret ever touches the repo settings.
 #   Trusted publishing needs npm CLI 11.5.1 or later; the "Ensure npm >= 11.5.1"
@@ -37,10 +41,16 @@
 #   without provenance cannot become a verified community node.
 #
 # Option B — npm granular access token (first release only, or fallback):
-#   1. On npmjs.com: Access Tokens → Generate New Token → Granular Access Token.
-#      Scope it to this package with "Read and write" publish permission.
+#   1. On npmjs.com: profile picture → Access Tokens → Generate New Token.
+#      Tick "Bypass two-factor authentication" (a CI job cannot answer a 2FA
+#      prompt). Packages and scopes: "Read and write (publish and stage)" on
+#      "All Packages" (a package that does not exist yet cannot be selected).
+#      A "stage only" token fails here: npm publish refuses it with
+#      E_STAGE_REQUIRED. Choose the shortest expiry.
 #   2. In GitHub: Settings → Secrets and variables → Actions → New secret.
 #      Name it NPM_TOKEN and paste the token value.
+#   3. After the release, delete the secret and the token. npm plans to stop
+#      direct publishing with bypass-2FA tokens in January 2027.
 #
 # Both options work with --provenance. Provenance is signed by GitHub's OIDC
 # infrastructure regardless of how npm authentication is handled.
