@@ -144,3 +144,7 @@ jobs:
           # `n8n-node release` already sets this when publishing; kept explicit so the
           # provenance attestation cannot be dropped by a CLI change.
           NPM_CONFIG_PROVENANCE: 'true'
+          # `n8n-node release` runs a bare `npm publish`, and npm refuses provenance for a
+          # package's first publish unless access is public (EUSAGE "Can't generate
+          # provenance for new or private package"). Unscoped packages are public anyway.
+          NPM_CONFIG_ACCESS: 'public'

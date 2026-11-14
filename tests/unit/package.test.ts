@@ -263,6 +263,8 @@ describe('publish workflow', () => {
 		expect(workflow).toContain('at_least "$(npm --version)" 11.5.1 || {');
 		expect(workflow).toContain('npm install -g npm@^11.5.1');
 		expect(workflow).toMatch(/^\s+NPM_CONFIG_PROVENANCE: 'true'$/m);
+		// A first publish with provenance is refused unless access is public.
+		expect(workflow).toMatch(/^\s+NPM_CONFIG_ACCESS: 'public'$/m);
 		expect(workflow).toMatch(/^\s+npm run release$/m);
 		expect(workflow.indexOf('- name: Ensure npm >= 11.5.1')).toBeGreaterThan(0);
 		expect(workflow.indexOf('- name: Ensure npm >= 11.5.1')).toBeLessThan(
